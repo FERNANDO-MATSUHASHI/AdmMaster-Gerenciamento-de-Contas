@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
   },
     preview: {
     allowedHosts: [
-      "site-shieldack.e6fnyq.easypanel.host",
+      "admmaster-gerenciamento-de-contas.e6fnyq.easypanel.host",
       "www.admmaster.com.br",
       "admmaster.com.br"
     ],
