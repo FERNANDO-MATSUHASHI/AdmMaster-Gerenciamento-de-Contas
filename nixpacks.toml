@@ -1,0 +1,12 @@
+[phases.setup]
+# força instalar node 18
+nixPkgs = ["nodejs-18_x"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run preview -- --port $PORT --host"
