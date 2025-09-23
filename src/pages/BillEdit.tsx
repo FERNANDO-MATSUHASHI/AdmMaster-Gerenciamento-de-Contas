@@ -26,6 +26,7 @@ const BillEdit = () => {
     check_number: "",
     account_number: "",
     account_name: "",
+    payment_type: "conta",
     status: "pending"
   });
 
@@ -69,6 +70,7 @@ const BillEdit = () => {
         check_number: data.check_number || "",
         account_number: data.account_number || "",
         account_name: data.account_name || "",
+        payment_type: data.payment_type || "conta",
         status: data.status || "pending"
       });
     } catch (error) {
@@ -96,6 +98,7 @@ const BillEdit = () => {
           check_number: formData.check_number || null,
           account_number: formData.account_number || null,
           account_name: formData.account_name || null,
+          payment_type: formData.payment_type,
           status: formData.status
         })
         .eq('id', id);
@@ -196,6 +199,34 @@ const BillEdit = () => {
                           {supplier.name}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+                  <Select value={formData.payment_type} onValueChange={(value) => setFormData({ ...formData, payment_type: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conta">Conta</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+                  <Select value={formData.payment_type} onValueChange={(value) => setFormData({ ...formData, payment_type: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conta">Conta</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

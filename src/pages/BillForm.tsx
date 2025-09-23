@@ -227,6 +227,7 @@ const BillForm = () => {
                         <SelectContent>
                           <SelectItem value="conta">Conta</SelectItem>
                           <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="boleto">Boleto</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

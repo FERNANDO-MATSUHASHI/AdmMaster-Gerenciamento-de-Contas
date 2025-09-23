@@ -9,11 +9,17 @@ import { Building2, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { translateErrorMessage } from "@/lib/errorMessages";
+import { formatPhoneNumber, unformatPhoneNumber } from "@/lib/phoneFormatter";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const { toast } = useToast();
@@ -55,11 +61,26 @@ const Login = () => {
           description: "Redirecionando para o dashboard...",
         });
       } else if (mode === 'register') {
+        // Verificar se as senhas coincidem
+        if (password !== confirmPassword) {
+          throw new Error('As senhas não coincidem');
+        }
+        
+        // Verificar se a senha tem pelo menos 6 caracteres
+        if (password.length < 6) {
+          throw new Error('A senha deve ter pelo menos 6 caracteres');
+        }
+        
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              phone: unformatPhoneNumber(phone)
+            }
           }
         });
         
@@ -120,6 +141,45 @@ const Login = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'register' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Nome</Label>
+                      <Input
+                        id="firstName"
+                        type="text"
+                        placeholder="Seu nome"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Sobrenome</Label>
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder="Seu sobrenome"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Celular</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(11) 99999-9999"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
                 <div className="relative">
@@ -137,28 +197,59 @@ const Login = () => {
               </div>
               
               {mode !== 'forgot' && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder={mode === 'register' ? "Crie uma senha" : "Digite sua senha"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder={mode === 'register' ? "Crie uma senha (mín. 6 caracteres)" : "Digite sua senha"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                        minLength={mode === 'register' ? 6 : undefined}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+
+                  {mode === 'register' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Digite a senha novamente"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="pl-10 pr-10"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {password && confirmPassword && password !== confirmPassword && (
+                        <p className="text-sm text-destructive">As senhas não coincidem</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
               <Button

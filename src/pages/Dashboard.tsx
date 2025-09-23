@@ -32,6 +32,7 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [allBills, setAllBills] = useState<any[]>([]);
   const [upcomingBills, setUpcomingBills] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [stats, setStats] = useState({
     pendingBills: 0,
     overdueBills: 0,
@@ -91,7 +92,25 @@ const Dashboard = () => {
   useEffect(() => {
     fetchBills();
     fetchStats();
+    fetchUserProfile();
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        setUserProfile(profile);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar perfil:', error);
+    }
+  };
 
   const fetchBills = async () => {
     try {
@@ -301,14 +320,22 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <button 
+                onClick={() => navigate("/perfil")}
+                className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center hover:bg-primary/90 transition-colors cursor-pointer"
+              >
                 <Building2 className="w-6 h-6 text-primary-foreground" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-lg sm:text-xl font-semibold">Gerenciador de Contas</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
                 </p>
+                {userProfile && (
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Olá, {userProfile.first_name} {userProfile.last_name}
+                  </p>
+                )}
               </div>
             </div>
             
