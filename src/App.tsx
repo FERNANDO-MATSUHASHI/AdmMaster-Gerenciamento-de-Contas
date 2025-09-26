@@ -13,6 +13,7 @@ import BillEdit from "./pages/BillEdit";
 import BillsList from "./pages/BillsList";
 import BankForm from "./pages/BankForm";
 import BanksList from "./pages/BanksList";
+import BankEdit from "./pages/BankEdit";
 import SupplierTypes from "./pages/SupplierTypes";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/contas" element={<BillsList />} />
           <Route path="/bancos" element={<BanksList />} />
           <Route path="/bancos/novo" element={<BankForm />} />
+          <Route path="/bancos/editar/:id" element={<BankEdit />} />
           <Route path="/tipos-fornecedor" element={<SupplierTypes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

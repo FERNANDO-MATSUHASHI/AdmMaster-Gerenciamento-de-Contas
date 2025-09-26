@@ -7,8 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Receipt, Save, Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { ArrowLeft, Receipt, Save, Calendar as CalendarIcon, Edit2, Plus, X } from "lucide-react";
+import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -34,12 +34,16 @@ const BillForm = () => {
     banco: "",
     titularConta: "",
     numeroConta: "",
-    nomeConta: ""
+    nomeConta: "",
+    // Campos do boleto
+    quantidadeParcelas: "1",
+    parcelasDatas: [new Date()]
   });
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState({
     entrada: false,
-    vencimento: false
+    vencimento: false,
+    parcelas: {} as Record<number, boolean>
   });
 
   // Load suppliers and banks from Supabase
@@ -77,6 +81,39 @@ const BillForm = () => {
     loadData();
   }, []);
 
+  // Função para calcular o valor da parcela
+  const calcularValorParcela = () => {
+    const valor = parseFloat(formData.valor) || 0;
+    const parcelas = parseInt(formData.quantidadeParcelas) || 1;
+    return (valor / parcelas).toFixed(2);
+  };
+
+  // Função para atualizar a quantidade de parcelas e suas datas
+  const handleQuantidadeParcelasChange = (quantidade: string) => {
+    const num = parseInt(quantidade) || 1;
+    const novasParcelas: Date[] = [];
+    
+    for (let i = 0; i < num; i++) {
+      novasParcelas.push(addMonths(formData.dataVencimento, i));
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      quantidadeParcelas: quantidade,
+      parcelasDatas: novasParcelas
+    }));
+  };
+
+  // Função para atualizar data específica de uma parcela
+  const handleParcelaDataChange = (index: number, date: Date) => {
+    const novasDatas = [...formData.parcelasDatas];
+    novasDatas[index] = date;
+    setFormData(prev => ({
+      ...prev,
+      parcelasDatas: novasDatas
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -95,34 +132,67 @@ const BillForm = () => {
         return;
       }
 
-      // Save bill to database
-      const { data, error } = await supabase
-        .from('bills')
-        .insert({
+      // Se for boleto, criar múltiplas contas (uma para cada parcela)
+      if (formData.paymentType === 'boleto') {
+        const contasParaInserir = formData.parcelasDatas.map((data, index) => ({
           user_id: user.id,
-          description: formData.descricao,
-          amount: parseFloat(formData.valor),
+          description: `${formData.descricao} (${index + 1}/${formData.quantidadeParcelas})`,
+          amount: parseFloat(calcularValorParcela()),
           supplier_id: formData.fornecedor || null,
-          due_date: format(formData.dataVencimento, 'yyyy-MM-dd'),
+          due_date: format(data, 'yyyy-MM-dd'),
           entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
           payment_type: formData.paymentType,
-          check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
-          bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
-          account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
+          check_number: null,
+          bank_id: null,
+          account_holder: null,
           account_number: formData.numeroConta || null,
           account_name: formData.nomeConta || null,
           status: 'pending'
-        })
-        .select();
+        }));
 
-      if (error) {
-        throw error;
+        const { data, error } = await supabase
+          .from('bills')
+          .insert(contasParaInserir)
+          .select();
+
+        if (error) {
+          throw error;
+        }
+
+        toast({
+          title: "Boleto parcelado salvo com sucesso!",
+          description: `${formData.quantidadeParcelas} parcelas foram registradas no sistema`,
+        });
+      } else {
+        // Save single bill to database
+        const { data, error } = await supabase
+          .from('bills')
+          .insert({
+            user_id: user.id,
+            description: formData.descricao,
+            amount: parseFloat(formData.valor),
+            supplier_id: formData.fornecedor || null,
+            due_date: format(formData.dataVencimento, 'yyyy-MM-dd'),
+            entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
+            payment_type: formData.paymentType,
+            check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
+            bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
+            account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
+            account_number: formData.numeroConta || null,
+            account_name: formData.nomeConta || null,
+            status: 'pending'
+          })
+          .select();
+
+        if (error) {
+          throw error;
+        }
+
+        toast({
+          title: "Conta salva com sucesso!",
+          description: "A conta foi registrada no sistema",
+        });
       }
-
-      toast({
-        title: "Conta salva com sucesso!",
-        description: "A conta foi registrada no sistema",
-      });
       
       navigate("/contas");
     } catch (error: any) {
@@ -317,7 +387,18 @@ const BillForm = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="banco">Banco *</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="banco">Banco *</Label>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => navigate("/bancos/novo")}
+                            className="h-auto p-1"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                         <Select value={formData.banco} onValueChange={(value) => handleInputChange("banco", value)} required={formData.paymentType === "cheque"}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o banco" />
@@ -346,6 +427,83 @@ const BillForm = () => {
                   </div>
                 )}
 
+                {/* Dados do Boleto (aparecem quando tipo = boleto) */}
+                {formData.paymentType === "boleto" && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Dados do Boleto</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="quantidadeParcelas">Quantidade de Parcelas *</Label>
+                        <Input
+                          id="quantidadeParcelas"
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={formData.quantidadeParcelas}
+                          onChange={(e) => handleQuantidadeParcelasChange(e.target.value)}
+                          required={formData.paymentType === "boleto"}
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="valorParcela">Valor da Parcela</Label>
+                        <Input
+                          id="valorParcela"
+                          type="text"
+                          value={`R$ ${calcularValorParcela()}`}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Datas de Vencimento das Parcelas */}
+                    <div className="space-y-3">
+                      <Label>Datas de Vencimento das Parcelas</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {formData.parcelasDatas.map((data, index) => (
+                          <div key={index} className="space-y-2">
+                            <Label className="text-sm text-muted-foreground">
+                              Parcela {index + 1}
+                            </Label>
+                            <Popover 
+                              open={isDatePickerOpen.parcelas[index] || false} 
+                              onOpenChange={(open) => setIsDatePickerOpen(prev => ({ 
+                                ...prev, 
+                                parcelas: { ...prev.parcelas, [index]: open } 
+                              }))}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {format(data, "dd/MM/yyyy", { locale: ptBR })}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={data}
+                                  onSelect={(date) => {
+                                    if (date) handleParcelaDataChange(index, date);
+                                    setIsDatePickerOpen(prev => ({ 
+                                      ...prev, 
+                                      parcelas: { ...prev.parcelas, [index]: false } 
+                                    }));
+                                  }}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex justify-end space-x-4 pt-6">

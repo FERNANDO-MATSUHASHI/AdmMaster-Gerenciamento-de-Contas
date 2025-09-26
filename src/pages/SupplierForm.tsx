@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSupplierOperations } from "@/hooks/useSupplierOperations";
+import { formatPhoneNumber } from "@/lib/phoneFormatter";
+import { formatCNPJ } from "@/lib/cnpjFormatter";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,7 +119,13 @@ const SupplierForm = () => {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === "phone") {
+      setFormData(prev => ({ ...prev, [field]: formatPhoneNumber(value) }));
+    } else if (field === "cnpj") {
+      setFormData(prev => ({ ...prev, [field]: formatCNPJ(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleEdit = (supplier: any) => {

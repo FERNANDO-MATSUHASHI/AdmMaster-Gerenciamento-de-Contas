@@ -170,6 +170,10 @@ const BanksList = () => {
                     </div>
                     
                     <div className="flex items-center space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/bancos/editar/${bank.id}`)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="sm">
