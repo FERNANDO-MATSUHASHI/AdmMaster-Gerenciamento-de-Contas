@@ -37,7 +37,8 @@ const BillForm = () => {
     nomeConta: "",
     // Campos do boleto
     quantidadeParcelas: "1",
-    parcelasDatas: [new Date()]
+    parcelasDatas: [new Date()],
+    parcelasValores: [0]
   });
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState({
@@ -92,16 +93,60 @@ const BillForm = () => {
   const handleQuantidadeParcelasChange = (quantidade: string) => {
     const num = parseInt(quantidade) || 1;
     const novasParcelas: Date[] = [];
+    const novosValores: number[] = [];
+    const valor = parseFloat(formData.valor) || 0;
+    const valorParcela = valor / num; // Calcular com a nova quantidade
     
     for (let i = 0; i < num; i++) {
       novasParcelas.push(addMonths(formData.dataVencimento, i));
+      novosValores.push(valorParcela);
     }
     
     setFormData(prev => ({
       ...prev,
       quantidadeParcelas: quantidade,
-      parcelasDatas: novasParcelas
+      parcelasDatas: novasParcelas,
+      parcelasValores: novosValores
     }));
+  };
+
+  // Função para atualizar o valor total e recalcular as parcelas
+  const handleValorTotalChange = (valor: string) => {
+    const novoValor = parseFloat(valor) || 0;
+    const parcelas = parseInt(formData.quantidadeParcelas) || 1;
+    const valorParcela = (novoValor / parcelas);
+    
+    // Criar array com o número correto de parcelas, todas com o valor calculado
+    const novosValores = Array(parcelas).fill(valorParcela);
+    
+    setFormData(prev => ({
+      ...prev,
+      valor: valor,
+      parcelasValores: novosValores
+    }));
+  };
+
+  // Função para sincronizar valores quando mudar para tipo boleto
+  const handlePaymentTypeChange = (tipo: string) => {
+    if (tipo === "boleto") {
+      const valor = parseFloat(formData.valor) || 0;
+      const parcelas = parseInt(formData.quantidadeParcelas) || 1;
+      const valorParcela = valor / parcelas;
+      
+      // Inicializar valores das parcelas se necessário
+      if (formData.parcelasValores.length === 0 || formData.parcelasValores.every(v => v === 0)) {
+        const novosValores = Array(parcelas).fill(valorParcela);
+        setFormData(prev => ({
+          ...prev,
+          paymentType: tipo,
+          parcelasValores: novosValores
+        }));
+      } else {
+        handleInputChange("paymentType", tipo);
+      }
+    } else {
+      handleInputChange("paymentType", tipo);
+    }
   };
 
   // Função para atualizar data específica de uma parcela
@@ -111,6 +156,16 @@ const BillForm = () => {
     setFormData(prev => ({
       ...prev,
       parcelasDatas: novasDatas
+    }));
+  };
+
+  // Função para atualizar valor específico de uma parcela
+  const handleParcelaValorChange = (index: number, valor: string) => {
+    const novosValores = [...formData.parcelasValores];
+    novosValores[index] = parseFloat(valor) || 0;
+    setFormData(prev => ({
+      ...prev,
+      parcelasValores: novosValores
     }));
   };
 
@@ -137,7 +192,7 @@ const BillForm = () => {
         const contasParaInserir = formData.parcelasDatas.map((data, index) => ({
           user_id: user.id,
           description: `${formData.descricao} (${index + 1}/${formData.quantidadeParcelas})`,
-          amount: parseFloat(calcularValorParcela()),
+          amount: formData.parcelasValores[index] || parseFloat(calcularValorParcela()),
           supplier_id: formData.fornecedor || null,
           due_date: format(data, 'yyyy-MM-dd'),
           entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
@@ -267,7 +322,13 @@ const BillForm = () => {
                         step="0.01"
                         placeholder="0,00"
                         value={formData.valor}
-                        onChange={(e) => handleInputChange("valor", e.target.value)}
+                        onChange={(e) => {
+                          if (formData.paymentType === "boleto") {
+                            handleValorTotalChange(e.target.value);
+                          } else {
+                            handleInputChange("valor", e.target.value);
+                          }
+                        }}
                         required
                       />
                     </div>
@@ -290,7 +351,7 @@ const BillForm = () => {
 
                     <div>
                       <Label htmlFor="paymentType">Tipo de Pagamento *</Label>
-                      <Select value={formData.paymentType} onValueChange={(value) => handleInputChange("paymentType", value)}>
+                      <Select value={formData.paymentType} onValueChange={handlePaymentTypeChange}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
@@ -333,39 +394,43 @@ const BillForm = () => {
                               setIsDatePickerOpen(prev => ({ ...prev, entrada: false }));
                             }}
                             initialFocus
+                            className="p-3 pointer-events-auto"
                           />
                         </PopoverContent>
                       </Popover>
                     </div>
 
-                    <div>
-                      <Label>Data de Vencimento *</Label>
-                      <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !formData.dataVencimento && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.dataVencimento ? format(formData.dataVencimento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={formData.dataVencimento}
-                            onSelect={(date) => {
-                              if (date) handleInputChange("dataVencimento", date);
-                              setIsDatePickerOpen(prev => ({ ...prev, vencimento: false }));
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                    {formData.paymentType !== "boleto" && (
+                      <div>
+                        <Label>Data de Vencimento *</Label>
+                        <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !formData.dataVencimento && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {formData.dataVencimento ? format(formData.dataVencimento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={formData.dataVencimento}
+                              onSelect={(date) => {
+                                if (date) handleInputChange("dataVencimento", date);
+                                setIsDatePickerOpen(prev => ({ ...prev, vencimento: false }));
+                              }}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -450,10 +515,25 @@ const BillForm = () => {
                         <Label htmlFor="valorParcela">Valor da Parcela</Label>
                         <Input
                           id="valorParcela"
-                          type="text"
-                          value={`R$ ${calcularValorParcela()}`}
-                          disabled
-                          className="bg-muted"
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={calcularValorParcela()}
+                          onChange={(e) => {
+                            const novoValorParcela = parseFloat(e.target.value) || 0;
+                            const parcelas = parseInt(formData.quantidadeParcelas) || 1;
+                            const valorTotal = (novoValorParcela * parcelas).toFixed(2);
+                            
+                            // Atualizar o valor total
+                            handleInputChange("valor", valorTotal);
+                            
+                            // Atualizar todos os valores das parcelas
+                            const novosValores = formData.parcelasValores.map(() => novoValorParcela);
+                            setFormData(prev => ({
+                              ...prev,
+                              parcelasValores: novosValores
+                            }));
+                          }}
                         />
                       </div>
                     </div>
@@ -461,43 +541,57 @@ const BillForm = () => {
                     {/* Datas de Vencimento das Parcelas */}
                     <div className="space-y-3">
                       <Label>Datas de Vencimento das Parcelas</Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3">
                         {formData.parcelasDatas.map((data, index) => (
                           <div key={index} className="space-y-2">
                             <Label className="text-sm text-muted-foreground">
                               Parcela {index + 1}
                             </Label>
-                            <Popover 
-                              open={isDatePickerOpen.parcelas[index] || false} 
-                              onOpenChange={(open) => setIsDatePickerOpen(prev => ({ 
-                                ...prev, 
-                                parcelas: { ...prev.parcelas, [index]: open } 
-                              }))}
-                            >
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="w-full justify-start text-left font-normal"
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                <Popover 
+                                  open={isDatePickerOpen.parcelas[index] || false} 
+                                  onOpenChange={(open) => setIsDatePickerOpen(prev => ({ 
+                                    ...prev, 
+                                    parcelas: { ...prev.parcelas, [index]: open } 
+                                  }))}
                                 >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(data, "dd/MM/yyyy", { locale: ptBR })}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={data}
-                                  onSelect={(date) => {
-                                    if (date) handleParcelaDataChange(index, date);
-                                    setIsDatePickerOpen(prev => ({ 
-                                      ...prev, 
-                                      parcelas: { ...prev.parcelas, [index]: false } 
-                                    }));
-                                  }}
-                                  initialFocus
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full justify-start text-left font-normal"
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {format(data, "dd/MM/yyyy", { locale: ptBR })}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={data}
+                                      onSelect={(date) => {
+                                        if (date) handleParcelaDataChange(index, date);
+                                        setIsDatePickerOpen(prev => ({ 
+                                          ...prev, 
+                                          parcelas: { ...prev.parcelas, [index]: false } 
+                                        }));
+                                      }}
+                                      initialFocus
+                                      className="p-3 pointer-events-auto"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                              <div className="w-32">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Valor"
+                                  value={formData.parcelasValores[index] !== undefined && formData.parcelasValores[index] > 0 ? formData.parcelasValores[index].toFixed(2) : calcularValorParcela()}
+                                  onChange={(e) => handleParcelaValorChange(index, e.target.value)}
                                 />
-                              </PopoverContent>
-                            </Popover>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>

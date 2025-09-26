@@ -83,9 +83,11 @@ const SupplierForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Build address string
-    const addressParts = [formData.address, formData.cnpj].filter(Boolean);
-    const fullAddress = addressParts.join(" - ");
+    // Store CNPJ and address separately in the address field with a delimiter
+    const addressParts = [];
+    if (formData.address) addressParts.push(formData.address);
+    if (formData.cnpj) addressParts.push(`CNPJ: ${formData.cnpj}`);
+    const fullAddress = addressParts.join(" | ");
 
     const supplierFormData = {
       name: formData.name,
@@ -130,12 +132,28 @@ const SupplierForm = () => {
 
   const handleEdit = (supplier: any) => {
     setEditingSupplier(supplier);
+    
+    // Parse address and CNPJ from stored address field
+    let address = "";
+    let cnpj = "";
+    
+    if (supplier.address) {
+      const parts = supplier.address.split(" | ");
+      address = parts[0] || "";
+      
+      // Look for CNPJ in the parts
+      const cnpjPart = parts.find((part: string) => part.startsWith("CNPJ: "));
+      if (cnpjPart) {
+        cnpj = cnpjPart.replace("CNPJ: ", "");
+      }
+    }
+    
     setFormData({
       name: supplier.name || "",
       email: supplier.email || "",
       phone: supplier.phone || "",
-      address: supplier.address || "",
-      cnpj: "", // CNPJ is stored in address, would need parsing
+      address: address,
+      cnpj: cnpj,
       type_id: supplier.type_id || ""
     });
     setShowForm(true);
@@ -238,9 +256,18 @@ const SupplierForm = () => {
                             {supplier.phone && (
                               <p>📞 {supplier.phone}</p>
                             )}
-                            {supplier.address && (
-                              <p>📍 {supplier.address}</p>
-                            )}
+                            {supplier.address && (() => {
+                              const parts = supplier.address.split(" | ");
+                              const address = parts[0];
+                              const cnpjPart = parts.find((part: string) => part.startsWith("CNPJ: "));
+                              
+                              return (
+                                <>
+                                  {address && <p>📍 {address}</p>}
+                                  {cnpjPart && <p>🏢 {cnpjPart}</p>}
+                                </>
+                              );
+                            })()}
                             <div className="flex items-center gap-1 mt-2">
                               <Calendar className="w-3 h-3" />
                               <span>Criado em {format(new Date(supplier.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
