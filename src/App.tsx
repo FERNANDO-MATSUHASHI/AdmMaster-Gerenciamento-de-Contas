@@ -10,6 +10,7 @@ import Profile from "./pages/Profile";
 import SupplierForm from "./pages/SupplierForm";
 import BillForm from "./pages/BillForm";
 import BillEdit from "./pages/BillEdit";
+import BillDetail from "./pages/BillDetail";
 import BillsList from "./pages/BillsList";
 import BankForm from "./pages/BankForm";
 import BanksList from "./pages/BanksList";
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/fornecedores/novo" element={<SupplierForm />} />
           <Route path="/contas/nova" element={<BillForm />} />
           <Route path="/contas/editar/:id" element={<BillEdit />} />
+          <Route path="/conta/:id" element={<BillDetail />} />
           <Route path="/contas" element={<BillsList />} />
           <Route path="/bancos" element={<BanksList />} />
           <Route path="/bancos/novo" element={<BankForm />} />

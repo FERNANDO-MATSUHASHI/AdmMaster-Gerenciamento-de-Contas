@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-import { Resend } from "npm:resend@2.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -144,21 +142,12 @@ const handler = async (req: Request): Promise<Response> => {
             currency: 'BRL'
           }).format(totalAmount)}</strong></p>
           <p>Não esqueça de quitar suas contas para evitar juros e multas!</p>
-          <p>Acesse seu <a href="${Deno.env.get("SUPABASE_URL")?.replace('supabase.co', 'lovable.app') || 'https://your-app.com'}/dashboard">painel de controle</a> para mais detalhes.</p>
+          <p>Acesse seu painel de controle para mais detalhes.</p>
         `;
 
-        const { error: emailError } = await resend.emails.send({
-          from: "Gerenciador de Contas <noreply@resend.dev>",
-          to: [notification.user_email],
-          subject: `🔔 ${notification.bills.length} conta(s) vencem hoje - ${new Date().toLocaleDateString('pt-BR')}`,
-          html: emailHtml,
-        });
-
-        if (emailError) {
-          console.error(`Email error for ${notification.user_email}:`, emailError);
-        } else {
-          console.log(`Email sent successfully to ${notification.user_email}`);
-        }
+        // Note: Email functionality is disabled for now
+        // To enable email notifications, you would need to add an email service
+        console.log(`Would send email to ${notification.user_email}:`, emailHtml);
 
         // Note: SMS functionality would require a service like Twilio
         // For now, we're only implementing email notifications

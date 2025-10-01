@@ -14,7 +14,11 @@ import {
   Edit,
   Trash2,
   Check,
-  Receipt
+  Receipt,
+  Eye,
+  Paperclip,
+  FileText,
+  Image as ImageIcon
 } from "lucide-react";
 import {
   AlertDialog,
@@ -27,6 +31,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -44,6 +57,13 @@ const BillsList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [bills, setBills] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [paymentProofDialog, setPaymentProofDialog] = useState<{open: boolean, billId: string | null}>({
+    open: false,
+    billId: null
+  });
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
+  const [selectedPaymentProof, setSelectedPaymentProof] = useState<{file: File, billId: string} | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -65,6 +85,8 @@ const BillsList = () => {
           amount,
           status,
           payment_type,
+          attachment_url,
+          payment_proof_url,
           suppliers (name)
         `)
         .order('due_date', { ascending: true });
@@ -84,7 +106,9 @@ const BillsList = () => {
         amount: bill.amount,
         supplier: bill.suppliers?.name || 'Sem fornecedor',
         status: bill.status,
-        paymentType: bill.payment_type
+        paymentType: bill.payment_type,
+        attachmentUrl: bill.attachment_url,
+        payment_proof_url: bill.payment_proof_url
       })) || [];
       
       // Update status for overdue bills
@@ -108,6 +132,203 @@ const BillsList = () => {
   };
 
   // Remove old updateBillStatus function - now using the secure hook
+
+  // Função para visualizar anexo
+  const handleViewAttachment = async (attachmentUrl: string) => {
+    try {
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('User not authenticated');
+
+      // Make direct fetch request to edge function with authentication
+      const response = await fetch(
+        `https://nbetcemynduklddhqgyu.supabase.co/functions/v1/download-attachment`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path: attachmentUrl }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load attachment');
+      }
+
+      // Get blob from response
+      const blob = await response.blob();
+      
+      // Create blob URL with correct content type
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Open in new tab
+      window.open(blobUrl, '_blank');
+      
+      // Clean up URL after a delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch (error) {
+      console.error('Erro ao visualizar anexo:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao visualizar anexo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePaymentProofUpload = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && paymentProofDialog.billId) {
+        // Show confirmation dialog with file preview
+        setSelectedPaymentProof({ file, billId: paymentProofDialog.billId });
+        setPaymentProofConfirmDialog(true);
+      }
+    };
+    input.click();
+  };
+
+  const handleConfirmPaymentProof = async () => {
+    if (!selectedPaymentProof) return;
+
+    setUploadingProof(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const fileExt = selectedPaymentProof.file.name.split('.').pop();
+      const fileName = `payment_proof_${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('bill-attachments')
+        .upload(filePath, selectedPaymentProof.file);
+
+      if (uploadError) throw uploadError;
+
+      // Update bill with payment proof URL
+      const { error: updateError } = await supabase
+        .from('bills')
+        .update({ 
+          payment_proof_url: filePath 
+        })
+        .eq('id', selectedPaymentProof.billId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: "Comprovante anexado com sucesso!",
+      });
+
+      // Now mark as paid
+      const bill = bills.find(b => b.id === selectedPaymentProof.billId);
+      if (bill) {
+        await updateBillStatus(bill, 'paid' as BillStatus, fetchBills);
+      }
+
+      setPaymentProofDialog({ open: false, billId: null });
+      setPaymentProofConfirmDialog(false);
+      setSelectedPaymentProof(null);
+      fetchBills();
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast({
+        title: "Erro",
+        description: translateErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  const handleChooseAnotherFile = () => {
+    setPaymentProofConfirmDialog(false);
+    setSelectedPaymentProof(null);
+    // Trigger file selection again
+    if (selectedPaymentProof?.billId) {
+      const billId = selectedPaymentProof.billId;
+      setTimeout(() => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (file) {
+            setSelectedPaymentProof({ file, billId });
+            setPaymentProofConfirmDialog(true);
+          }
+        };
+        input.click();
+      }, 100);
+    }
+  };
+
+  const uploadPaymentProof = async (file: File, billId: string) => {
+    setUploadingProof(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `payment_proof_${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('bill-attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Update bill with payment proof URL
+      const { error: updateError } = await supabase
+        .from('bills')
+        .update({ 
+          payment_proof_url: filePath 
+        })
+        .eq('id', billId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: "Comprovante anexado com sucesso!",
+      });
+
+      // Now mark as paid
+      const bill = bills.find(b => b.id === billId);
+      if (bill) {
+        await updateBillStatus(bill, 'paid' as BillStatus, fetchBills);
+      }
+
+      setPaymentProofDialog({ open: false, billId: null });
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast({
+        title: "Erro",
+        description: translateErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  const handleMarkAsPaidWithoutProof = async (billId: string) => {
+    const bill = bills.find(b => b.id === billId);
+    if (bill) {
+      await updateBillStatus(bill, 'paid' as BillStatus, fetchBills);
+      setPaymentProofDialog({ open: false, billId: null });
+    }
+  };
 
   const deleteBill = async (billId: string) => {
     try {
@@ -300,6 +521,29 @@ const BillsList = () => {
                   
                   {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    {bill.status === 'paid' && bill.payment_proof_url && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => handleViewAttachment(bill.payment_proof_url!)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        Ver Comprovante
+                      </Button>
+                    )}
+                    
+                    {bill.attachmentUrl && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => handleViewAttachment(bill.attachmentUrl)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        Ver Anexo
+                      </Button>
+                    )}
                     {bill.status !== 'paid' && (
                       <>
                         <Button 
@@ -338,8 +582,11 @@ const BillsList = () => {
                     )}
                     
                     {bill.status !== 'paid' && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                      <Dialog 
+                        open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
+                        onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
+                      >
+                        <DialogTrigger asChild>
                           <Button 
                             size="sm" 
                             variant="outline"
@@ -348,27 +595,40 @@ const BillsList = () => {
                             <Check className="w-4 h-4 mr-1" />
                             Marcar como Paga
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar pagamento</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja marcar esta conta como paga? 
-                              Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => updateBillStatus(bill, 'paid' as BillStatus, fetchBills)}
-                              className="bg-green-500 hover:bg-green-600"
-                              disabled={isUpdating}
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Marcar Conta como Paga</DialogTitle>
+                            <DialogDescription>
+                              Deseja anexar um comprovante de pagamento?
+                            </DialogDescription>
+                          </DialogHeader>
+                          
+                          <div className="space-y-4 py-4">
+                            <div className="text-sm text-muted-foreground">
+                              Você pode anexar um comprovante de pagamento (PDF, JPG ou PNG) ou marcar como paga sem comprovante.
+                            </div>
+                          </div>
+
+                          <DialogFooter className="flex-col sm:flex-row gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => handleMarkAsPaidWithoutProof(bill.id)}
+                              disabled={uploadingProof || isUpdating}
                             >
-                              {isUpdating ? "Processando..." : "Confirmar Pagamento"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              Marcar sem Comprovante
+                            </Button>
+                            <Button
+                              onClick={handlePaymentProofUpload}
+                              disabled={uploadingProof || isUpdating}
+                              className="bg-green-500 hover:bg-green-600"
+                            >
+                              <Paperclip className="w-4 h-4 mr-2" />
+                              {uploadingProof ? "Enviando..." : "Anexar Comprovante"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     )}
                   </div>
                 </div>
@@ -395,6 +655,57 @@ const BillsList = () => {
           </Card>
         )}
       </div>
+
+      {/* Payment Proof Confirmation Dialog */}
+      <Dialog open={paymentProofConfirmDialog} onOpenChange={setPaymentProofConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Comprovante de Pagamento</DialogTitle>
+            <DialogDescription>
+              Revise o arquivo selecionado antes de continuar
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPaymentProof && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
+                <div className="flex items-center gap-3">
+                  {selectedPaymentProof.file.type.includes('pdf') ? (
+                    <FileText className="w-8 h-8 text-primary" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-primary" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{selectedPaymentProof.file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(selectedPaymentProof.file.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Confirma que deseja anexar este arquivo como comprovante de pagamento?
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleChooseAnotherFile}
+              disabled={uploadingProof}
+            >
+              Escolher Outro Arquivo
+            </Button>
+            <Button
+              onClick={handleConfirmPaymentProof}
+              disabled={uploadingProof}
+            >
+              {uploadingProof ? "Enviando..." : "Confirmar e Anexar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

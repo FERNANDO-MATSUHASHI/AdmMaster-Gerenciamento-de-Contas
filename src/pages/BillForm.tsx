@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowLeft, Receipt, Save, Calendar as CalendarIcon, Edit2, Plus, X } from "lucide-react";
+import { ArrowLeft, Receipt, Save, Calendar as CalendarIcon, Edit2, Plus, X, Camera, Paperclip, Eye } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -38,14 +38,176 @@ const BillForm = () => {
     // Campos do boleto
     quantidadeParcelas: "1",
     parcelasDatas: [new Date()],
-    parcelasValores: [0]
+    parcelasValores: [0],
+    // Campo do arquivo anexado
+    attachmentUrl: ""
   });
+
+  const [selectedFiles, setSelectedFiles] = useState<(File | null)[]>([null]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showAttachmentOptions, setShowAttachmentOptions] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState({
     entrada: false,
     vencimento: false,
     parcelas: {} as Record<number, boolean>
   });
+
+  // Detectar se é mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Função para upload de arquivo
+  const uploadFile = async (file: File): Promise<string | null> => {
+    try {
+      setIsUploading(true);
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('bill-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      return fileName;
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível fazer upload do arquivo",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Função para capturar foto
+  const handleCameraCapture = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setSelectedFile(file);
+        setShowAttachmentOptions(false);
+      }
+    };
+    input.click();
+  };
+
+  // Função para selecionar arquivo para uma parcela específica
+  const handleFileSelectForParcela = (parcelaIndex: number) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf,.pdf,.jpg,.jpeg,.png';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const novosArquivos = [...selectedFiles];
+        novosArquivos[parcelaIndex] = file;
+        setSelectedFiles(novosArquivos);
+      }
+    };
+    input.click();
+  };
+
+  // Função para capturar foto para uma parcela específica
+  const handleCameraCaptureForParcela = (parcelaIndex: number) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const novosArquivos = [...selectedFiles];
+        novosArquivos[parcelaIndex] = file;
+        setSelectedFiles(novosArquivos);
+      }
+    };
+    input.click();
+  };
+
+  // Função para remover arquivo de uma parcela específica
+  const handleRemoveFileFromParcela = (parcelaIndex: number) => {
+    const novosArquivos = [...selectedFiles];
+    novosArquivos[parcelaIndex] = null;
+    setSelectedFiles(novosArquivos);
+  };
+  // Função para selecionar arquivo
+  const handleFileSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf,.pdf,.jpg,.jpeg,.png';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setSelectedFile(file);
+        setShowAttachmentOptions(false);
+      }
+    };
+    input.click();
+  };
+
+  // Função para remover arquivo
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFormData(prev => ({ ...prev, attachmentUrl: "" }));
+  };
+
+  // Função para visualizar arquivo anexado - usando edge function segura
+  const handleViewAttachment = async (attachmentUrl: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      const { data, error } = await supabase.functions.invoke('download-attachment', {
+        body: { path: attachmentUrl },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      // Create blob URL and open in new tab
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Erro ao visualizar anexo:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao visualizar anexo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Load suppliers and banks from Supabase
   useEffect(() => {
@@ -102,12 +264,17 @@ const BillForm = () => {
       novosValores.push(valorParcela);
     }
     
+    // Ajustar array de arquivos anexados para cada parcela
+    const novosArquivos: (File | null)[] = Array(num).fill(null);
+    
     setFormData(prev => ({
       ...prev,
       quantidadeParcelas: quantidade,
       parcelasDatas: novasParcelas,
       parcelasValores: novosValores
     }));
+    
+    setSelectedFiles(novosArquivos);
   };
 
   // Função para atualizar o valor total e recalcular as parcelas
@@ -187,8 +354,27 @@ const BillForm = () => {
         return;
       }
 
+      // Upload do arquivo se houver um selecionado
+      let attachmentUrl = formData.attachmentUrl;
+      if (selectedFile) {
+        const uploadedUrl = await uploadFile(selectedFile);
+        if (uploadedUrl) {
+          attachmentUrl = uploadedUrl;
+        }
+      }
+
       // Se for boleto, criar múltiplas contas (uma para cada parcela)
       if (formData.paymentType === 'boleto') {
+        // Fazer upload dos arquivos de cada parcela se houver
+        const uploadPromises = selectedFiles.map(async (file, index) => {
+          if (file) {
+            return await uploadFile(file);
+          }
+          return null;
+        });
+
+        const uploadedUrls = await Promise.all(uploadPromises);
+
         const contasParaInserir = formData.parcelasDatas.map((data, index) => ({
           user_id: user.id,
           description: `${formData.descricao} (${index + 1}/${formData.quantidadeParcelas})`,
@@ -202,7 +388,8 @@ const BillForm = () => {
           account_holder: null,
           account_number: formData.numeroConta || null,
           account_name: formData.nomeConta || null,
-          status: 'pending'
+          status: 'pending',
+          attachment_url: uploadedUrls[index] || null
         }));
 
         const { data, error } = await supabase
@@ -212,6 +399,31 @@ const BillForm = () => {
 
         if (error) {
           throw error;
+        }
+
+        // Salvar anexos individuais na tabela bill_installment_attachments
+        const installmentAttachments = [];
+        for (let i = 0; i < data.length; i++) {
+          if (uploadedUrls[i]) {
+            installmentAttachments.push({
+              bill_id: data[i].id,
+              installment_number: i + 1,
+              attachment_url: uploadedUrls[i],
+              file_name: selectedFiles[i]?.name || '',
+              file_type: selectedFiles[i]?.type || '',
+              user_id: user.id
+            });
+          }
+        }
+
+        if (installmentAttachments.length > 0) {
+          const { error: attachmentError } = await supabase
+            .from('bill_installment_attachments')
+            .insert(installmentAttachments);
+          
+          if (attachmentError) {
+            console.error('Error saving installment attachments:', attachmentError);
+          }
         }
 
         toast({
@@ -235,7 +447,8 @@ const BillForm = () => {
             account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
             account_number: formData.numeroConta || null,
             account_name: formData.nomeConta || null,
-            status: 'pending'
+            status: 'pending',
+            attachment_url: attachmentUrl
           })
           .select();
 
@@ -320,7 +533,7 @@ const BillForm = () => {
                         id="valor"
                         type="number"
                         step="0.01"
-                        placeholder="0,00"
+                        placeholder="0.00"
                         value={formData.valor}
                         onChange={(e) => {
                           if (formData.paymentType === "boleto") {
@@ -538,84 +751,230 @@ const BillForm = () => {
                       </div>
                     </div>
 
-                    {/* Datas de Vencimento das Parcelas */}
-                    <div className="space-y-3">
-                      <Label>Datas de Vencimento das Parcelas</Label>
-                      <div className="grid grid-cols-1 gap-3">
-                        {formData.parcelasDatas.map((data, index) => (
-                          <div key={index} className="space-y-2">
-                            <Label className="text-sm text-muted-foreground">
-                              Parcela {index + 1}
-                            </Label>
-                            <div className="flex gap-2">
-                              <div className="flex-1">
-                                <Popover 
-                                  open={isDatePickerOpen.parcelas[index] || false} 
-                                  onOpenChange={(open) => setIsDatePickerOpen(prev => ({ 
-                                    ...prev, 
-                                    parcelas: { ...prev.parcelas, [index]: open } 
-                                  }))}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      className="w-full justify-start text-left font-normal"
-                                    >
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {format(data, "dd/MM/yyyy", { locale: ptBR })}
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      selected={data}
-                                      onSelect={(date) => {
-                                        if (date) handleParcelaDataChange(index, date);
-                                        setIsDatePickerOpen(prev => ({ 
-                                          ...prev, 
-                                          parcelas: { ...prev.parcelas, [index]: false } 
-                                        }));
-                                      }}
-                                      initialFocus
-                                      className="p-3 pointer-events-auto"
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                              <div className="w-32">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Valor"
-                                  value={formData.parcelasValores[index] !== undefined && formData.parcelasValores[index] > 0 ? formData.parcelasValores[index].toFixed(2) : calcularValorParcela()}
-                                  onChange={(e) => handleParcelaValorChange(index, e.target.value)}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                     {/* Datas de Vencimento das Parcelas */}
+                     <div className="space-y-3">
+                       <Label>Datas de Vencimento das Parcelas</Label>
+                       <div className="grid grid-cols-1 gap-3">
+                         {formData.parcelasDatas.map((data, index) => (
+                           <div key={index} className="space-y-2">
+                             <Label className="text-sm text-muted-foreground">
+                               Parcela {index + 1}
+                             </Label>
+                             <div className="flex gap-2">
+                               <div className="flex-1">
+                                 <Popover 
+                                   open={isDatePickerOpen.parcelas[index] || false} 
+                                   onOpenChange={(open) => setIsDatePickerOpen(prev => ({ 
+                                     ...prev, 
+                                     parcelas: { ...prev.parcelas, [index]: open } 
+                                   }))}
+                                 >
+                                   <PopoverTrigger asChild>
+                                     <Button
+                                       variant="outline"
+                                       className="w-full justify-start text-left font-normal"
+                                     >
+                                       <CalendarIcon className="mr-2 h-4 w-4" />
+                                       {format(data, "dd/MM/yyyy", { locale: ptBR })}
+                                     </Button>
+                                   </PopoverTrigger>
+                                   <PopoverContent className="w-auto p-0" align="start">
+                                     <Calendar
+                                       mode="single"
+                                       selected={data}
+                                       onSelect={(date) => {
+                                         if (date) handleParcelaDataChange(index, date);
+                                         setIsDatePickerOpen(prev => ({ 
+                                           ...prev, 
+                                           parcelas: { ...prev.parcelas, [index]: false } 
+                                         }));
+                                       }}
+                                       initialFocus
+                                       className="p-3 pointer-events-auto"
+                                     />
+                                   </PopoverContent>
+                                 </Popover>
+                               </div>
+                               <div className="w-32">
+                                 <Input
+                                   type="number"
+                                   step="0.01"
+                                   placeholder="Valor"
+                                   value={formData.parcelasValores[index] !== undefined && formData.parcelasValores[index] > 0 ? formData.parcelasValores[index].toFixed(2) : calcularValorParcela()}
+                                   onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                 />
+                               </div>
+                             </div>
+                             
+                              {/* Anexo para cada parcela quando há 2 ou mais parcelas */}
+                              {parseInt(formData.quantidadeParcelas) >= 2 && (
+                               <div className="mt-2">
+                                 <Label className="text-xs text-muted-foreground">
+                                   Anexo da Parcela {index + 1}
+                                 </Label>
+                                 
+                                 {!selectedFiles[index] && (
+                                   <div className="flex gap-1 mt-1">
+                                     <Button
+                                       type="button"
+                                       variant="outline"
+                                       size="sm"
+                                       onClick={() => handleFileSelectForParcela(index)}
+                                       className="text-xs"
+                                     >
+                                       <Paperclip className="w-3 h-3 mr-1" />
+                                       Anexar
+                                     </Button>
+                                     {isMobile && (
+                                       <Button
+                                         type="button"
+                                         variant="outline"
+                                         size="sm"
+                                         onClick={() => handleCameraCaptureForParcela(index)}
+                                         className="text-xs"
+                                       >
+                                         <Camera className="w-3 h-3 mr-1" />
+                                         Foto
+                                       </Button>
+                                     )}
+                                   </div>
+                                 )}
+                                 
+                                 {selectedFiles[index] && (
+                                   <div className="flex items-center justify-between p-2 bg-muted rounded-md mt-1">
+                                     <span className="text-xs truncate">{selectedFiles[index]?.name}</span>
+                                     <Button
+                                       type="button"
+                                       variant="ghost"
+                                       size="sm"
+                                       onClick={() => handleRemoveFileFromParcela(index)}
+                                     >
+                                       <X className="w-3 h-3" />
+                                     </Button>
+                                   </div>
+                                 )}
+                               </div>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex justify-end space-x-4 pt-6">
-                  <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    <Save className="w-4 h-4 mr-2" />
-                    {isLoading ? "Salvando..." : "Salvar Conta"}
-                  </Button>
+                {/* Seção de Anexo - apenas para pagamentos que não são boleto ou boletos com 1 parcela */}
+                {formData.paymentType !== 'boleto' || parseInt(formData.quantidadeParcelas) < 2 ? (
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Anexar Arquivo</Label>
+                  
+                  {!selectedFile && !formData.attachmentUrl && (
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowAttachmentOptions(!showAttachmentOptions)}
+                        className="w-full"
+                      >
+                        <Paperclip className="w-4 h-4 mr-2" />
+                        Anexar Arquivo
+                      </Button>
+                      
+                      {showAttachmentOptions && (
+                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border rounded-md shadow-lg">
+                          {isMobile ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleFileSelect}
+                                className="w-full justify-start rounded-none"
+                              >
+                                <Paperclip className="w-4 h-4 mr-2" />
+                                Anexar arquivo existente
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleCameraCapture}
+                                className="w-full justify-start rounded-none"
+                              >
+                                <Camera className="w-4 h-4 mr-2" />
+                                Abrir câmera
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={handleFileSelect}
+                              className="w-full justify-start rounded-none"
+                            >
+                              <Paperclip className="w-4 h-4 mr-2" />
+                              Selecionar arquivo
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {selectedFile && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                      <span className="text-sm truncate">{selectedFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveFile}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {formData.attachmentUrl && !selectedFile && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                      <span className="text-sm">Arquivo anexado</span>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewAttachment(formData.attachmentUrl)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveFile}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              ) : null}
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-4 pt-6">
+                <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  <Save className="w-4 h-4 mr-2" />
+                  {isLoading ? "Salvando..." : "Salvar Conta"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default BillForm;

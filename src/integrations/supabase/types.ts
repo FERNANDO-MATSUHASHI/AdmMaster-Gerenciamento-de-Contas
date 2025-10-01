@@ -71,12 +71,49 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_installment_attachments: {
+        Row: {
+          attachment_url: string
+          bill_id: string
+          created_at: string
+          file_name: string | null
+          file_type: string | null
+          id: string
+          installment_number: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attachment_url: string
+          bill_id: string
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          installment_number: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          attachment_url?: string
+          bill_id?: string
+          created_at?: string
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          installment_number?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           account_holder: string | null
           account_name: string | null
           account_number: string | null
           amount: number
+          attachment_url: string | null
           bank_id: string | null
           check_number: string | null
           created_at: string
@@ -84,6 +121,7 @@ export type Database = {
           due_date: string
           entry_date: string
           id: string
+          payment_proof_url: string | null
           payment_type: string | null
           status: string | null
           supplier_id: string | null
@@ -95,6 +133,7 @@ export type Database = {
           account_name?: string | null
           account_number?: string | null
           amount: number
+          attachment_url?: string | null
           bank_id?: string | null
           check_number?: string | null
           created_at?: string
@@ -102,6 +141,7 @@ export type Database = {
           due_date: string
           entry_date: string
           id?: string
+          payment_proof_url?: string | null
           payment_type?: string | null
           status?: string | null
           supplier_id?: string | null
@@ -113,6 +153,7 @@ export type Database = {
           account_name?: string | null
           account_number?: string | null
           amount?: number
+          attachment_url?: string | null
           bank_id?: string | null
           check_number?: string | null
           created_at?: string
@@ -120,6 +161,7 @@ export type Database = {
           due_date?: string
           entry_date?: string
           id?: string
+          payment_proof_url?: string | null
           payment_type?: string | null
           status?: string | null
           supplier_id?: string | null

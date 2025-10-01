@@ -13,13 +13,24 @@ import {
   DollarSign,
   Menu,
   LogOut,
-  Landmark
+  Landmark,
+  Eye,
+  FileText,
+  Image as ImageIcon
 } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Extend the Window interface to include inactivityTimer
 declare global {
@@ -40,6 +51,9 @@ const Dashboard = () => {
     paidBills: 0
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
+  const [selectedPaymentProof, setSelectedPaymentProof] = useState<{file: File, billId: string} | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
   const navigate = useNavigate();
 
   // Auto-logout após 10 minutos de inatividade
@@ -123,6 +137,8 @@ const Dashboard = () => {
           due_date,
           amount,
           status,
+          attachment_url,
+          payment_proof_url,
           suppliers (name)
         `)
         .order('due_date', { ascending: true });
@@ -145,6 +161,8 @@ const Dashboard = () => {
         amount: bill.amount,
         supplier: bill.suppliers?.name || "Sem fornecedor",
         status: bill.status,
+        attachmentUrl: bill.attachment_url,
+        paymentProofUrl: bill.payment_proof_url,
       })) || [];
       
       // Atualizar status das contas baseado na data atual ANTES de salvar
@@ -219,6 +237,170 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
+    }
+  };
+
+  // Função para visualizar anexo
+  const handleViewAttachment = async (attachmentUrl: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      const { data, error } = await supabase.functions.invoke('download-attachment', {
+        body: { path: attachmentUrl },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      // Create blob URL and open in new tab
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Erro ao visualizar anexo:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao visualizar anexo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Funções para ações nas contas
+  const handleEditBill = (billId: string) => {
+    navigate(`/contas/editar/${billId}`);
+  };
+
+  const handleDeleteBill = async (billId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bills')
+        .delete()
+        .eq('id', billId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Conta excluída com sucesso!",
+      });
+
+      fetchBills();
+      fetchStats();
+    } catch (error) {
+      console.error('Erro ao excluir conta:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir conta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAsPaid = async (billId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bills')
+        .update({ status: 'paid' })
+        .eq('id', billId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Conta marcada como paga!",
+      });
+
+      fetchBills();
+      fetchStats();
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar status da conta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUploadPaymentProof = async (billId: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        // Show confirmation dialog with file preview
+        setSelectedPaymentProof({ file, billId });
+        setPaymentProofConfirmDialog(true);
+      }
+    };
+    input.click();
+  };
+
+  const handleConfirmPaymentProof = async () => {
+    if (!selectedPaymentProof) return;
+
+    setUploadingProof(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const fileExt = selectedPaymentProof.file.name.split('.').pop();
+      const fileName = `payment_proof_${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('bill-attachments')
+        .upload(filePath, selectedPaymentProof.file);
+
+      if (uploadError) throw uploadError;
+
+      // Update bill with payment proof and mark as paid
+      const { error: updateError } = await supabase
+        .from('bills')
+        .update({ 
+          payment_proof_url: filePath,
+          status: 'paid'
+        })
+        .eq('id', selectedPaymentProof.billId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: "Comprovante anexado e conta marcada como paga!",
+      });
+
+      fetchBills();
+      fetchStats();
+      setPaymentProofConfirmDialog(false);
+      setSelectedPaymentProof(null);
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao anexar comprovante",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  const handleChooseAnotherFile = () => {
+    setPaymentProofConfirmDialog(false);
+    setSelectedPaymentProof(null);
+    // Trigger file selection again
+    if (selectedPaymentProof?.billId) {
+      setTimeout(() => handleUploadPaymentProof(selectedPaymentProof.billId), 100);
     }
   };
 
@@ -416,10 +598,15 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-2 sm:p-6">
-              <CalendarWithBills 
-                bills={allBills}
-                onDateSelect={setSelectedDate}
-              />
+            <CalendarWithBills 
+              bills={allBills}
+              onDateSelect={setSelectedDate}
+              onEditBill={handleEditBill}
+              onDeleteBill={handleDeleteBill}
+              onMarkAsPaid={handleMarkAsPaid}
+              onViewAttachment={handleViewAttachment}
+              onUploadPaymentProof={handleUploadPaymentProof}
+            />
             </CardContent>
           </Card>
 
@@ -509,6 +696,57 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Payment Proof Confirmation Dialog */}
+      <Dialog open={paymentProofConfirmDialog} onOpenChange={setPaymentProofConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Comprovante de Pagamento</DialogTitle>
+            <DialogDescription>
+              Revise o arquivo selecionado antes de continuar
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPaymentProof && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
+                <div className="flex items-center gap-3">
+                  {selectedPaymentProof.file.type.includes('pdf') ? (
+                    <FileText className="w-8 h-8 text-primary" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-primary" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{selectedPaymentProof.file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(selectedPaymentProof.file.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Confirma que deseja anexar este arquivo como comprovante de pagamento?
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleChooseAnotherFile}
+              disabled={uploadingProof}
+            >
+              Escolher Outro Arquivo
+            </Button>
+            <Button
+              onClick={handleConfirmPaymentProof}
+              disabled={uploadingProof}
+            >
+              {uploadingProof ? "Enviando..." : "Confirmar e Anexar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

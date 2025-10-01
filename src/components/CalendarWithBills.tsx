@@ -2,7 +2,27 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Clock, Edit, Trash2, Check, Eye, Paperclip } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameMonth, isToday, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -14,19 +34,37 @@ interface Bill {
   amount: number;
   supplier: string;
   status: string;
+  attachmentUrl?: string;
+  paymentProofUrl?: string;
 }
 
 interface CalendarWithBillsProps {
   bills: Bill[];
   onDateSelect?: (date: Date) => void;
+  onEditBill?: (billId: string) => void;
+  onDeleteBill?: (billId: string) => void;
+  onMarkAsPaid?: (billId: string) => void;
+  onViewAttachment?: (attachmentUrl: string) => void;
+  onUploadPaymentProof?: (billId: string) => void;
+  isUpdating?: boolean;
 }
 
 export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({ 
   bills, 
-  onDateSelect 
+  onDateSelect,
+  onEditBill,
+  onDeleteBill,
+  onMarkAsPaid,
+  onViewAttachment,
+  onUploadPaymentProof,
+  isUpdating = false
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [paymentProofDialog, setPaymentProofDialog] = useState<{open: boolean, billId: string | null}>({
+    open: false,
+    billId: null
+  });
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -202,25 +240,150 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
             </h3>
             
             {getBillsForDate(selectedDate).length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {getBillsForDate(selectedDate).map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{bill.description}</p>
-                      <p className="text-sm text-muted-foreground">{bill.supplier}</p>
+                  <div 
+                    key={bill.id} 
+                    className="p-3 bg-secondary/50 rounded-lg space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium">{bill.description}</p>
+                        <p className="text-sm text-muted-foreground">{bill.supplier}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL'
+                          }).format(bill.amount)}
+                        </p>
+                        <Badge className={`${getStatusColor(bill.status)} text-xs`}>
+                          {bill.status === 'pending' ? 'Pendente' :
+                           bill.status === 'overdue' ? 'Vencida' :
+                           bill.status === 'paid' ? 'Paga' : 'Desconhecido'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-primary">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(bill.amount)}
-                      </p>
-                      <Badge className={`${getStatusColor(bill.status)} text-xs`}>
-                        {bill.status === 'pending' ? 'Pendente' :
-                         bill.status === 'overdue' ? 'Vencida' :
-                         bill.status === 'paid' ? 'Paga' : 'Desconhecido'}
-                      </Badge>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 pt-2 border-t">
+                      {bill.status === 'paid' && bill.paymentProofUrl && (
+                        <Button 
+                          size="sm"
+                          variant="outline" 
+                          onClick={() => onViewAttachment?.(bill.paymentProofUrl!)}
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Ver Comprovante
+                        </Button>
+                      )}
+                      
+                      {bill.attachmentUrl && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => onViewAttachment(bill.attachmentUrl!)}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Ver Anexo
+                        </Button>
+                      )}
+                      
+                      {bill.status !== 'paid' && (
+                        <>
+                          {onEditBill && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => onEditBill(bill.id)}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Editar
+                            </Button>
+                          )}
+                          
+                          {onDeleteBill && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="outline">
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Excluir
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir a conta "{bill.description}"? Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => onDeleteBill(bill.id)}>
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          
+                          {onMarkAsPaid && onUploadPaymentProof && (
+                            <Dialog 
+                              open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
+                              onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
+                            >
+                              <DialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                >
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Marcar como Paga
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Marcar Conta como Paga</DialogTitle>
+                                  <DialogDescription>
+                                    Deseja anexar um comprovante de pagamento?
+                                  </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="space-y-4 py-4">
+                                  <div className="text-sm text-muted-foreground">
+                                    Você pode anexar um comprovante de pagamento (PDF, JPG ou PNG) ou marcar como paga sem comprovante.
+                                  </div>
+                                </div>
+
+                                <DialogFooter className="flex-col sm:flex-row gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      onMarkAsPaid(bill.id);
+                                      setPaymentProofDialog({ open: false, billId: null });
+                                    }}
+                                    disabled={isUpdating}
+                                  >
+                                    Marcar sem Comprovante
+                                  </Button>
+                                  <Button
+                                    onClick={() => {
+                                      onUploadPaymentProof(bill.id);
+                                      setPaymentProofDialog({ open: false, billId: null });
+                                    }}
+                                    disabled={isUpdating}
+                                  >
+                                    <Paperclip className="w-4 h-4 mr-2" />
+                                    Anexar Comprovante
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
