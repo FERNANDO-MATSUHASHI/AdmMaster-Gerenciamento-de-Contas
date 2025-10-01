@@ -246,17 +246,23 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No active session');
 
-      const { data, error } = await supabase.functions.invoke('download-attachment', {
-        body: { path: attachmentUrl },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      // Use fetch directly to get proper response with headers
+      const response = await fetch(
+        `https://nbetcemynduklddhqgyu.supabase.co/functions/v1/download-attachment`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path: attachmentUrl }),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to download file');
 
-      // Create blob URL and open in new tab
-      const blob = new Blob([data], { type: 'application/octet-stream' });
+      // Get the blob with correct content type from response
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       
