@@ -35,10 +35,11 @@ const BillForm = () => {
     titularConta: "",
     numeroConta: "",
     nomeConta: "",
-    // Campos do boleto
+    // Campos do boleto/cheque parcelado
     quantidadeParcelas: "1",
     parcelasDatas: [new Date()],
     parcelasValores: [0],
+    parcelasNumerosCheque: [""],
     // Campo do arquivo anexado
     attachmentUrl: ""
   });
@@ -256,12 +257,14 @@ const BillForm = () => {
     const num = parseInt(quantidade) || 1;
     const novasParcelas: Date[] = [];
     const novosValores: number[] = [];
+    const novosNumerosCheque: string[] = [];
     const valor = parseFloat(formData.valor) || 0;
     const valorParcela = valor / num; // Calcular com a nova quantidade
     
     for (let i = 0; i < num; i++) {
       novasParcelas.push(addMonths(formData.dataVencimento, i));
       novosValores.push(valorParcela);
+      novosNumerosCheque.push("");
     }
     
     // Ajustar array de arquivos anexados para cada parcela
@@ -271,7 +274,8 @@ const BillForm = () => {
       ...prev,
       quantidadeParcelas: quantidade,
       parcelasDatas: novasParcelas,
-      parcelasValores: novosValores
+      parcelasValores: novosValores,
+      parcelasNumerosCheque: novosNumerosCheque
     }));
     
     setSelectedFiles(novosArquivos);
@@ -293,9 +297,9 @@ const BillForm = () => {
     }));
   };
 
-  // Função para sincronizar valores quando mudar para tipo boleto
+  // Função para sincronizar valores quando mudar para tipo boleto ou cheque
   const handlePaymentTypeChange = (tipo: string) => {
-    if (tipo === "boleto") {
+    if (tipo === "boleto" || tipo === "cheque") {
       const valor = parseFloat(formData.valor) || 0;
       const parcelas = parseInt(formData.quantidadeParcelas) || 1;
       const valorParcela = valor / parcelas;
@@ -336,6 +340,16 @@ const BillForm = () => {
     }));
   };
 
+  // Função para atualizar número do cheque específico de uma parcela
+  const handleParcelaNumeroChequeChange = (index: number, numero: string) => {
+    const novosNumeros = [...formData.parcelasNumerosCheque];
+    novosNumeros[index] = numero;
+    setFormData(prev => ({
+      ...prev,
+      parcelasNumerosCheque: novosNumeros
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -363,8 +377,8 @@ const BillForm = () => {
         }
       }
 
-      // Se for boleto, criar múltiplas contas (uma para cada parcela)
-      if (formData.paymentType === 'boleto') {
+      // Se for boleto ou cheque com parcelas, criar múltiplas contas (uma para cada parcela)
+      if ((formData.paymentType === 'boleto' || formData.paymentType === 'cheque') && parseInt(formData.quantidadeParcelas) >= 2) {
         // Fazer upload dos arquivos de cada parcela se houver
         const uploadPromises = selectedFiles.map(async (file, index) => {
           if (file) {
@@ -383,14 +397,13 @@ const BillForm = () => {
           due_date: format(data, 'yyyy-MM-dd'),
           entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
           payment_type: formData.paymentType,
-          check_number: null,
-          bank_id: null,
-          account_holder: null,
+          check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
+          bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
+          account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
           account_number: formData.numeroConta || null,
           account_name: formData.nomeConta || null,
           status: 'pending',
-          // Para boleto à vista (1 parcela), usar o anexo geral. Para parcelado, usar anexos individuais
-          attachment_url: parseInt(formData.quantidadeParcelas) === 1 ? attachmentUrl : (uploadedUrls[index] || null)
+          attachment_url: uploadedUrls[index] || null
         }));
 
         const { data, error } = await supabase
@@ -427,8 +440,9 @@ const BillForm = () => {
           }
         }
 
+        const tipoTexto = formData.paymentType === 'boleto' ? 'Boleto' : 'Cheque';
         toast({
-          title: "Boleto parcelado salvo com sucesso!",
+          title: `${tipoTexto} parcelado salvo com sucesso!`,
           description: `${formData.quantidadeParcelas} parcelas foram registradas no sistema`,
         });
       } else {
@@ -537,7 +551,7 @@ const BillForm = () => {
                         placeholder="0.00"
                         value={formData.valor}
                         onChange={(e) => {
-                          if (formData.paymentType === "boleto") {
+                          if (formData.paymentType === "boleto" || formData.paymentType === "cheque") {
                             handleValorTotalChange(e.target.value);
                           } else {
                             handleInputChange("valor", e.target.value);
@@ -614,7 +628,7 @@ const BillForm = () => {
                       </Popover>
                     </div>
 
-                    {formData.paymentType !== "boleto" && (
+                    {!(formData.paymentType === "boleto" || (formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) > 1)) && (
                       <div>
                         <Label>Data de Vencimento *</Label>
                         <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
@@ -648,8 +662,8 @@ const BillForm = () => {
                   </div>
                 </div>
 
-                {/* Dados do Cheque (aparecem quando tipo = cheque) */}
-                {formData.paymentType === "cheque" && (
+                {/* Dados do Cheque (aparecem quando tipo = cheque e não é parcelado) */}
+                {formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) === 1 && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Dados do Cheque</h3>
                     
@@ -661,7 +675,7 @@ const BillForm = () => {
                           placeholder="000001"
                           value={formData.numeroCheque}
                           onChange={(e) => handleInputChange("numeroCheque", e.target.value)}
-                          required={formData.paymentType === "cheque"}
+                          required={formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) === 1}
                         />
                       </div>
 
@@ -706,10 +720,59 @@ const BillForm = () => {
                   </div>
                 )}
 
-                {/* Dados do Boleto (aparecem quando tipo = boleto) */}
-                {formData.paymentType === "boleto" && (
+                {/* Banco e Titular para cheques parcelados (aparecem quando tipo = cheque e é parcelado) */}
+                {formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) >= 2 && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Dados do Boleto</h3>
+                    <h3 className="text-lg font-medium">Dados do Cheque</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="banco">Banco *</Label>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => navigate("/bancos/novo")}
+                            className="h-auto p-1"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <Select value={formData.banco} onValueChange={(value) => handleInputChange("banco", value)} required={formData.paymentType === "cheque"}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o banco" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {banks.map((bank) => (
+                              <SelectItem key={bank.id} value={bank.id}>
+                                {bank.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="titularConta">Titular da Conta *</Label>
+                        <Input
+                          id="titularConta"
+                          placeholder="Nome do titular"
+                          value={formData.titularConta}
+                          onChange={(e) => handleInputChange("titularConta", e.target.value)}
+                          required={formData.paymentType === "cheque"}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dados de Parcelamento (aparecem quando tipo = boleto ou cheque) */}
+                {(formData.paymentType === "boleto" || formData.paymentType === "cheque") && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">
+                      {formData.paymentType === "boleto" ? "Dados do Boleto" : "Dados do Cheque"}
+                    </h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -721,7 +784,7 @@ const BillForm = () => {
                           placeholder="1"
                           value={formData.quantidadeParcelas}
                           onChange={(e) => handleQuantidadeParcelasChange(e.target.value)}
-                          required={formData.paymentType === "boleto"}
+                          required={formData.paymentType === "boleto" || formData.paymentType === "cheque"}
                         />
                       </div>
 
@@ -761,6 +824,20 @@ const BillForm = () => {
                              <Label className="text-sm text-muted-foreground">
                                Parcela {index + 1}
                              </Label>
+                             
+                             {/* Número do Cheque individual para cheques parcelados */}
+                             {formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) >= 2 && (
+                               <div>
+                                 <Label className="text-xs text-muted-foreground">Número do Cheque *</Label>
+                                 <Input
+                                   placeholder="000001"
+                                   value={formData.parcelasNumerosCheque[index] || ""}
+                                   onChange={(e) => handleParcelaNumeroChequeChange(index, e.target.value)}
+                                   required
+                                 />
+                               </div>
+                             )}
+                             
                              <div className="flex gap-2">
                                <div className="flex-1">
                                  <Popover 
@@ -863,8 +940,8 @@ const BillForm = () => {
                   </div>
                 )}
 
-                {/* Seção de Anexo (disponível para todos os tipos de pagamento, exceto boleto parcelado) */}
-                {!(formData.paymentType === "boleto" && parseInt(formData.quantidadeParcelas) >= 2) && (
+                {/* Seção de Anexo (disponível para todos os tipos de pagamento, exceto boleto/cheque parcelado) */}
+                {!((formData.paymentType === "boleto" || formData.paymentType === "cheque") && parseInt(formData.quantidadeParcelas) >= 2) && (
                 <div className="space-y-4">
                   <Label className="text-base font-semibold">Anexar Arquivo</Label>
                 
