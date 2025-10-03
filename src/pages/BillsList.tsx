@@ -514,7 +514,7 @@ const BillsList = () => {
                       <Receipt className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-sm text-muted-foreground">Tipo:</span>
                       <span className="text-sm font-medium">
-                        {bill.paymentType === 'cheque' ? 'Cheque' : 'Conta'}
+                        {bill.paymentType === 'cheque' ? 'Cheque' : bill.paymentType === 'boleto' ? 'Boleto' : 'Conta'}
                       </span>
                     </div>
                   </div>

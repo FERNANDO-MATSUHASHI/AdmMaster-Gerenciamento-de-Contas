@@ -389,7 +389,8 @@ const BillForm = () => {
           account_number: formData.numeroConta || null,
           account_name: formData.nomeConta || null,
           status: 'pending',
-          attachment_url: uploadedUrls[index] || null
+          // Para boleto à vista (1 parcela), usar o anexo geral. Para parcelado, usar anexos individuais
+          attachment_url: parseInt(formData.quantidadeParcelas) === 1 ? attachmentUrl : (uploadedUrls[index] || null)
         }));
 
         const { data, error } = await supabase
@@ -862,47 +863,27 @@ const BillForm = () => {
                   </div>
                 )}
 
-                {/* Seção de Anexo - apenas para pagamentos que não são boleto ou boletos com 1 parcela */}
-                {formData.paymentType !== 'boleto' || parseInt(formData.quantidadeParcelas) < 2 ? (
-                  <div className="space-y-4">
-                    <Label className="text-base font-semibold">Anexar Arquivo</Label>
-                  
-                  {!selectedFile && !formData.attachmentUrl && (
-                    <div className="relative">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowAttachmentOptions(!showAttachmentOptions)}
-                        className="w-full"
-                      >
-                        <Paperclip className="w-4 h-4 mr-2" />
-                        Anexar Arquivo
-                      </Button>
-                      
-                      {showAttachmentOptions && (
-                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border rounded-md shadow-lg">
-                          {isMobile ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={handleFileSelect}
-                                className="w-full justify-start rounded-none"
-                              >
-                                <Paperclip className="w-4 h-4 mr-2" />
-                                Anexar arquivo existente
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={handleCameraCapture}
-                                className="w-full justify-start rounded-none"
-                              >
-                                <Camera className="w-4 h-4 mr-2" />
-                                Abrir câmera
-                              </Button>
-                            </>
-                          ) : (
+                {/* Seção de Anexo (disponível para todos os tipos de pagamento, exceto boleto parcelado) */}
+                {!(formData.paymentType === "boleto" && parseInt(formData.quantidadeParcelas) >= 2) && (
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Anexar Arquivo</Label>
+                
+                {!selectedFile && !formData.attachmentUrl && (
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAttachmentOptions(!showAttachmentOptions)}
+                      className="w-full"
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Anexar Arquivo
+                    </Button>
+                    
+                    {showAttachmentOptions && (
+                      <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border rounded-md shadow-lg">
+                        {isMobile ? (
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
@@ -910,17 +891,60 @@ const BillForm = () => {
                               className="w-full justify-start rounded-none"
                             >
                               <Paperclip className="w-4 h-4 mr-2" />
-                              Selecionar arquivo
+                              Anexar arquivo existente
                             </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {selectedFile && (
-                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <span className="text-sm truncate">{selectedFile.name}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={handleCameraCapture}
+                              className="w-full justify-start rounded-none"
+                            >
+                              <Camera className="w-4 h-4 mr-2" />
+                              Abrir câmera
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={handleFileSelect}
+                            className="w-full justify-start rounded-none"
+                          >
+                            <Paperclip className="w-4 h-4 mr-2" />
+                            Selecionar arquivo
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {selectedFile && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <span className="text-sm truncate">{selectedFile.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveFile}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                {formData.attachmentUrl && !selectedFile && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <span className="text-sm">Arquivo anexado</span>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewAttachment(formData.attachmentUrl)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"
@@ -930,33 +954,10 @@ const BillForm = () => {
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
-                  )}
-                  
-                  {formData.attachmentUrl && !selectedFile && (
-                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <span className="text-sm">Arquivo anexado</span>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewAttachment(formData.attachmentUrl)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleRemoveFile}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
+                  </div>
+                )}
+              </div>
+                )}
 
               {/* Actions */}
               <div className="flex justify-end space-x-4 pt-6">

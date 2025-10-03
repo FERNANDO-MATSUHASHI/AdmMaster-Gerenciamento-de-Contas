@@ -519,76 +519,74 @@ const BillEdit = () => {
                 </div>
               </div>
 
-              {/* Anexo para Conta e Cheque */}
-              {(formData.payment_type === "conta" || formData.payment_type === "cheque") && (
-                <div className="space-y-2">
-                  <Label>Anexo</Label>
-                  
-                  {!selectedFile && !existingAttachment && (
-                    <div className="flex gap-2">
+              {/* Anexo (disponível para todos os tipos) */}
+              <div className="space-y-2">
+                <Label>Anexo</Label>
+                
+                {!selectedFile && !existingAttachment && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFileSelect}
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Anexar Arquivo
+                    </Button>
+                    {isMobile && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleFileSelect}
+                        onClick={handleCameraCapture}
                       >
-                        <Paperclip className="w-4 h-4 mr-2" />
-                        Anexar Arquivo
+                        <Camera className="w-4 h-4 mr-2" />
+                        Tirar Foto
                       </Button>
-                      {isMobile && (
+                    )}
+                  </div>
+                )}
+                
+                {(selectedFile || existingAttachment) && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="w-4 h-4" />
+                      <span className="text-sm truncate">
+                        {selectedFile ? selectedFile.name : "Arquivo anexado"}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {existingAttachment && !selectedFile && (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={handleCameraCapture}
+                          onClick={() => handleViewAttachment(existingAttachment)}
                         >
-                          <Camera className="w-4 h-4 mr-2" />
-                          Tirar Foto
+                          <Eye className="w-4 h-4" />
                         </Button>
                       )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleFileSelect}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveFile}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </div>
-                  )}
-                  
-                  {(selectedFile || existingAttachment) && (
-                    <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="w-4 h-4" />
-                        <span className="text-sm truncate">
-                          {selectedFile ? selectedFile.name : "Arquivo anexado"}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        {existingAttachment && !selectedFile && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewAttachment(existingAttachment)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleFileSelect}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleRemoveFile}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               {/* Dados do Cheque (aparecem quando tipo = cheque) */}
               {formData.payment_type === "cheque" && (
