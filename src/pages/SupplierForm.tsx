@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 import { useSupplierOperations } from "@/hooks/useSupplierOperations";
 import { formatPhoneNumber } from "@/lib/phoneFormatter";
 import { formatCNPJ } from "@/lib/cnpjFormatter";
+import { useViaCEP } from "@/hooks/useViaCEP";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,13 +34,20 @@ const SupplierForm = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   
+  const { fetchAddress, formatCEP, isLoading: isFetchingCEP } = useViaCEP();
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
-    address: "",
     cnpj: "",
-    type_id: ""
+    type_id: "",
+    cep: "",
+    logradouro: "",
+    numero: "",
+    bairro: "",
+    cidade: "",
+    estado: ""
   });
 
   useEffect(() => {
@@ -83,10 +91,18 @@ const SupplierForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Store CNPJ and address separately in the address field with a delimiter
+    // Build full address from parts
     const addressParts = [];
-    if (formData.address) addressParts.push(formData.address);
+    if (formData.logradouro) {
+      let streetAddress = formData.logradouro;
+      if (formData.numero) streetAddress += `, ${formData.numero}`;
+      addressParts.push(streetAddress);
+    }
+    if (formData.bairro) addressParts.push(formData.bairro);
+    if (formData.cidade && formData.estado) addressParts.push(`${formData.cidade} - ${formData.estado}`);
+    if (formData.cep) addressParts.push(`CEP: ${formData.cep}`);
     if (formData.cnpj) addressParts.push(`CNPJ: ${formData.cnpj}`);
+    
     const fullAddress = addressParts.join(" | ");
 
     const supplierFormData = {
@@ -110,13 +126,37 @@ const SupplierForm = () => {
         name: "",
         email: "",
         phone: "",
-        address: "",
         cnpj: "",
-        type_id: ""
+        type_id: "",
+        cep: "",
+        logradouro: "",
+        numero: "",
+        bairro: "",
+        cidade: "",
+        estado: ""
       });
       setShowForm(false);
       setEditingSupplier(null);
       fetchSuppliers();
+    }
+  };
+
+  const handleCEPChange = async (cep: string) => {
+    const formatted = formatCEP(cep);
+    setFormData(prev => ({ ...prev, cep: formatted }));
+    
+    // Only fetch if CEP is complete
+    if (formatted.length === 9) {
+      const address = await fetchAddress(formatted);
+      if (address) {
+        setFormData(prev => ({
+          ...prev,
+          logradouro: address.logradouro,
+          bairro: address.bairro,
+          cidade: address.localidade,
+          estado: address.uf
+        }));
+      }
     }
   };
 
@@ -125,6 +165,8 @@ const SupplierForm = () => {
       setFormData(prev => ({ ...prev, [field]: formatPhoneNumber(value) }));
     } else if (field === "cnpj") {
       setFormData(prev => ({ ...prev, [field]: formatCNPJ(value) }));
+    } else if (field === "cep") {
+      handleCEPChange(value);
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -133,18 +175,48 @@ const SupplierForm = () => {
   const handleEdit = (supplier: any) => {
     setEditingSupplier(supplier);
     
-    // Parse address and CNPJ from stored address field
-    let address = "";
+    // Parse address parts from stored address field
+    let cep = "";
+    let logradouro = "";
+    let numero = "";
+    let bairro = "";
+    let cidade = "";
+    let estado = "";
     let cnpj = "";
     
     if (supplier.address) {
       const parts = supplier.address.split(" | ");
-      address = parts[0] || "";
       
-      // Look for CNPJ in the parts
+      // Extract CEP
+      const cepPart = parts.find((part: string) => part.startsWith("CEP: "));
+      if (cepPart) {
+        cep = cepPart.replace("CEP: ", "");
+      }
+      
+      // Extract CNPJ
       const cnpjPart = parts.find((part: string) => part.startsWith("CNPJ: "));
       if (cnpjPart) {
         cnpj = cnpjPart.replace("CNPJ: ", "");
+      }
+      
+      // Extract street address (first part, may contain number)
+      if (parts[0] && !parts[0].startsWith("CEP:") && !parts[0].startsWith("CNPJ:")) {
+        const streetParts = parts[0].split(", ");
+        logradouro = streetParts[0] || "";
+        numero = streetParts[1] || "";
+      }
+      
+      // Extract neighborhood
+      if (parts[1] && !parts[1].startsWith("CEP:") && !parts[1].startsWith("CNPJ:")) {
+        bairro = parts[1];
+      }
+      
+      // Extract city and state
+      const cityStatePart = parts.find((part: string) => part.includes(" - ") && !part.startsWith("CEP:") && !part.startsWith("CNPJ:"));
+      if (cityStatePart) {
+        const [c, s] = cityStatePart.split(" - ");
+        cidade = c || "";
+        estado = s || "";
       }
     }
     
@@ -152,9 +224,14 @@ const SupplierForm = () => {
       name: supplier.name || "",
       email: supplier.email || "",
       phone: supplier.phone || "",
-      address: address,
       cnpj: cnpj,
-      type_id: supplier.type_id || ""
+      type_id: supplier.type_id || "",
+      cep: cep,
+      logradouro: logradouro,
+      numero: numero,
+      bairro: bairro,
+      cidade: cidade,
+      estado: estado
     });
     setShowForm(true);
   };
@@ -172,9 +249,14 @@ const SupplierForm = () => {
       name: "",
       email: "",
       phone: "",
-      address: "",
       cnpj: "",
-      type_id: ""
+      type_id: "",
+      cep: "",
+      logradouro: "",
+      numero: "",
+      bairro: "",
+      cidade: "",
+      estado: ""
     });
     setShowForm(false);
     setEditingSupplier(null);
@@ -397,14 +479,75 @@ const SupplierForm = () => {
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Endereço</h3>
                     
-                    <div>
-                      <Label htmlFor="address">Endereço Completo</Label>
-                      <Input
-                        id="address"
-                        placeholder="Rua, número, bairro, cidade - UF, CEP"
-                        value={formData.address}
-                        onChange={(e) => handleInputChange("address", e.target.value)}
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <Label htmlFor="cep">CEP</Label>
+                        <Input
+                          id="cep"
+                          placeholder="00000-000"
+                          value={formData.cep}
+                          onChange={(e) => handleInputChange("cep", e.target.value)}
+                          maxLength={9}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="md:col-span-3">
+                        <Label htmlFor="logradouro">Rua</Label>
+                        <Input
+                          id="logradouro"
+                          placeholder="Nome da rua"
+                          value={formData.logradouro}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-1">
+                        <Label htmlFor="numero">Número</Label>
+                        <Input
+                          id="numero"
+                          placeholder="Nº"
+                          value={formData.numero}
+                          onChange={(e) => handleInputChange("numero", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="bairro">Bairro</Label>
+                        <Input
+                          id="bairro"
+                          placeholder="Bairro"
+                          value={formData.bairro}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="cidade">Cidade</Label>
+                        <Input
+                          id="cidade"
+                          placeholder="Cidade"
+                          value={formData.cidade}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="estado">Estado</Label>
+                        <Input
+                          id="estado"
+                          placeholder="UF"
+                          value={formData.estado}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -413,9 +556,9 @@ const SupplierForm = () => {
                     <Button type="button" variant="outline" onClick={handleCancel}>
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={isLoading}>
+                    <Button type="submit" disabled={isLoading || isFetchingCEP}>
                       <Save className="w-4 h-4 mr-2" />
-                      {isLoading ? "Salvando..." : (editingSupplier ? "Atualizar" : "Salvar Fornecedor")}
+                      {isLoading || isFetchingCEP ? "Salvando..." : (editingSupplier ? "Atualizar" : "Salvar Fornecedor")}
                     </Button>
                   </div>
                 </form>

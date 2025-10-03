@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { translateErrorMessage } from "@/lib/errorMessages";
 import { formatPhoneNumber, unformatPhoneNumber } from "@/lib/phoneFormatter";
+import { useViaCEP } from "@/hooks/useViaCEP";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -18,12 +19,19 @@ const Login = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [cep, setCep] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [estado, setEstado] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { fetchAddress, formatCEP, isLoading: isFetchingCEP } = useViaCEP();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -71,6 +79,19 @@ const Login = () => {
           throw new Error('A senha deve ter pelo menos 6 caracteres');
         }
         
+        // Build full address
+        const addressParts = [];
+        if (logradouro) {
+          let streetAddress = logradouro;
+          if (numero) streetAddress += `, ${numero}`;
+          addressParts.push(streetAddress);
+        }
+        if (bairro) addressParts.push(bairro);
+        if (cidade && estado) addressParts.push(`${cidade} - ${estado}`);
+        if (cep) addressParts.push(`CEP: ${cep}`);
+        
+        const fullAddress = addressParts.join(" | ");
+        
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -79,7 +100,8 @@ const Login = () => {
             data: {
               first_name: firstName,
               last_name: lastName,
-              phone: unformatPhoneNumber(phone)
+              phone: unformatPhoneNumber(phone),
+              address: fullAddress
             }
           }
         });
@@ -112,6 +134,22 @@ const Login = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCEPChange = async (value: string) => {
+    const formatted = formatCEP(value);
+    setCep(formatted);
+    
+    // Only fetch if CEP is complete
+    if (formatted.length === 9) {
+      const address = await fetchAddress(formatted);
+      if (address) {
+        setLogradouro(address.logradouro);
+        setBairro(address.bairro);
+        setCidade(address.localidade);
+        setEstado(address.uf);
+      }
     }
   };
 
@@ -176,6 +214,81 @@ const Login = () => {
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
                     />
+                  </div>
+
+                  <Separator className="my-4" />
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium">Endereço</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="cep">CEP</Label>
+                      <Input
+                        id="cep"
+                        placeholder="00000-000"
+                        value={cep}
+                        onChange={(e) => handleCEPChange(e.target.value)}
+                        maxLength={9}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2 space-y-2">
+                        <Label htmlFor="logradouro">Rua</Label>
+                        <Input
+                          id="logradouro"
+                          placeholder="Nome da rua"
+                          value={logradouro}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="numero">Número</Label>
+                        <Input
+                          id="numero"
+                          placeholder="Nº"
+                          value={numero}
+                          onChange={(e) => setNumero(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bairro">Bairro</Label>
+                      <Input
+                        id="bairro"
+                        placeholder="Bairro"
+                        value={bairro}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="cidade">Cidade</Label>
+                        <Input
+                          id="cidade"
+                          placeholder="Cidade"
+                          value={cidade}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="estado">Estado</Label>
+                        <Input
+                          id="estado"
+                          placeholder="UF"
+                          value={estado}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -255,7 +368,7 @@ const Login = () => {
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary-hover"
-                disabled={isLoading}
+                disabled={isLoading || isFetchingCEP}
               >
                 {isLoading ? (
                   mode === 'login' ? "Entrando..." : 
