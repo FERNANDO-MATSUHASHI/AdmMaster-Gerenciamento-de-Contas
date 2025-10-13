@@ -389,22 +389,28 @@ const BillForm = () => {
 
         const uploadedUrls = await Promise.all(uploadPromises);
 
-        const contasParaInserir = formData.parcelasDatas.map((data, index) => ({
-          user_id: user.id,
-          description: `${formData.descricao} (${index + 1}/${formData.quantidadeParcelas})`,
-          amount: formData.parcelasValores[index] || parseFloat(calcularValorParcela()),
-          supplier_id: formData.fornecedor || null,
-          due_date: format(data, 'yyyy-MM-dd'),
-          entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
+        const contasParaInserir = formData.parcelasDatas.map((data, index) => {
+          // Formatar datas sem conversão de timezone
+          const dueDate = new Date(data);
+          const entryDate = new Date(formData.dataEntrada);
+          
+          return {
+            user_id: user.id,
+            description: `${formData.descricao} (${index + 1}/${formData.quantidadeParcelas})`,
+            amount: formData.parcelasValores[index] || parseFloat(calcularValorParcela()),
+            supplier_id: formData.fornecedor || null,
+            due_date: `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`,
+            entry_date: `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`,
           payment_type: formData.paymentType,
-          check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
-          bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
-          account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
-          account_number: formData.numeroConta || null,
-          account_name: formData.nomeConta || null,
-          status: 'pending',
-          attachment_url: uploadedUrls[index] || null
-        }));
+            check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
+            bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
+            account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
+            account_number: formData.numeroConta || null,
+            account_name: formData.nomeConta || null,
+            status: 'pending',
+            attachment_url: uploadedUrls[index] || null
+          };
+        });
 
         const { data, error } = await supabase
           .from('bills')
@@ -447,6 +453,16 @@ const BillForm = () => {
         });
       } else {
         // Save single bill to database
+        // Formatar datas sem conversão de timezone
+        // Para boleto com 1 parcela, usar a data da primeira parcela ao invés de dataVencimento
+        const dueDate = formData.paymentType === 'boleto' && parseInt(formData.quantidadeParcelas) === 1
+          ? new Date(formData.parcelasDatas[0])
+          : new Date(formData.dataVencimento);
+        const entryDate = new Date(formData.dataEntrada);
+        
+        const dueDateFormatted = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+        const entryDateFormatted = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
+        
         const { data, error } = await supabase
           .from('bills')
           .insert({
@@ -454,8 +470,8 @@ const BillForm = () => {
             description: formData.descricao,
             amount: parseFloat(formData.valor),
             supplier_id: formData.fornecedor || null,
-            due_date: format(formData.dataVencimento, 'yyyy-MM-dd'),
-            entry_date: format(formData.dataEntrada, 'yyyy-MM-dd'),
+            due_date: dueDateFormatted,
+            entry_date: entryDateFormatted,
             payment_type: formData.paymentType,
             check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,

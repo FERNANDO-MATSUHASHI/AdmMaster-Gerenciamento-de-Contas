@@ -107,6 +107,12 @@ const BillEdit = () => {
 
       if (error) throw error;
       
+      // Função para converter string de data "YYYY-MM-DD" para Date local sem problemas de timezone
+      const parseLocalDate = (dateString: string) => {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      };
+      
       setFormData({
         description: data.description || "",
         amount: data.amount?.toString() || "",
@@ -121,7 +127,7 @@ const BillEdit = () => {
         payment_type: data.payment_type || "conta",
         status: data.status || "pending",
         quantidadeParcelas: "1",
-        parcelasDatas: [new Date(data.due_date || new Date())],
+        parcelasDatas: [data.due_date ? parseLocalDate(data.due_date) : new Date()],
         parcelasValores: [parseFloat(data.amount?.toString() || "0")]
       });
       
@@ -333,12 +339,17 @@ const BillEdit = () => {
         }
       }
 
+      // Para boleto, usar a data da parcela ao invés de due_date
+      const dueDateToSave = formData.payment_type === 'boleto' && formData.parcelasDatas[0]
+        ? format(formData.parcelasDatas[0], 'yyyy-MM-dd')
+        : formData.due_date;
+
       const { error } = await supabase
         .from('bills')
         .update({
           description: formData.description,
           amount: parseFloat(formData.amount),
-          due_date: formData.due_date,
+          due_date: dueDateToSave,
           entry_date: formData.entry_date,
           supplier_id: formData.supplier_id || null,
           check_number: formData.payment_type === 'cheque' ? formData.check_number || null : null,
@@ -414,35 +425,43 @@ const BillEdit = () => {
                   />
                 </div>
 
-                <div>
-                  <Label>Data de Vencimento *</Label>
-                  <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !formData.due_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.due_date ? format(new Date(formData.due_date), "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={formData.due_date ? new Date(formData.due_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) setFormData({ ...formData, due_date: format(date, 'yyyy-MM-dd') });
-                          setIsDatePickerOpen(prev => ({ ...prev, vencimento: false }));
-                        }}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {formData.payment_type !== "boleto" && (
+                  <div>
+                    <Label>Data de Vencimento *</Label>
+                    <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.due_date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.due_date ? (() => {
+                            const [year, month, day] = formData.due_date.split('-').map(Number);
+                            return format(new Date(year, month - 1, day), "dd/MM/yyyy", { locale: ptBR });
+                          })() : "Selecione a data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.due_date ? (() => {
+                            const [year, month, day] = formData.due_date.split('-').map(Number);
+                            return new Date(year, month - 1, day);
+                          })() : undefined}
+                          onSelect={(date) => {
+                            if (date) setFormData({ ...formData, due_date: format(date, 'yyyy-MM-dd') });
+                            setIsDatePickerOpen(prev => ({ ...prev, vencimento: false }));
+                          }}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
 
                 <div>
                   <Label>Data de Lançamento *</Label>
@@ -456,13 +475,19 @@ const BillEdit = () => {
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.entry_date ? format(new Date(formData.entry_date), "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                        {formData.entry_date ? (() => {
+                          const [year, month, day] = formData.entry_date.split('-').map(Number);
+                          return format(new Date(year, month - 1, day), "dd/MM/yyyy", { locale: ptBR });
+                        })() : "Selecione a data"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={formData.entry_date ? new Date(formData.entry_date) : undefined}
+                        selected={formData.entry_date ? (() => {
+                          const [year, month, day] = formData.entry_date.split('-').map(Number);
+                          return new Date(year, month - 1, day);
+                        })() : undefined}
                         onSelect={(date) => {
                           if (date) setFormData({ ...formData, entry_date: format(date, 'yyyy-MM-dd') });
                           setIsDatePickerOpen(prev => ({ ...prev, entrada: false }));

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Building2, Save, Plus, Edit, Trash2, Calendar } from "lucide-react";
+import { ArrowLeft, Building2, Save, Plus, Edit, Trash2, Calendar, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -33,6 +33,7 @@ const SupplierForm = () => {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   
   const { fetchAddress, formatCEP, isLoading: isFetchingCEP } = useViaCEP();
   
@@ -291,12 +292,24 @@ const SupplierForm = () => {
         {!showForm ? (
           // Suppliers List View
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <h2 className="text-2xl font-bold">Lista de Fornecedores</h2>
-              <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Novo Fornecedor
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-initial sm:min-w-[300px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar fornecedor..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Button onClick={() => setShowForm(true)} className="flex items-center gap-2 whitespace-nowrap">
+                  <Plus className="w-4 h-4" />
+                  Novo Fornecedor
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-4">
@@ -317,7 +330,19 @@ const SupplierForm = () => {
                   </CardContent>
                 </Card>
               ) : (
-                suppliers.map((supplier) => (
+                suppliers
+                  .filter((supplier) => {
+                    if (!searchTerm) return true;
+                    const search = searchTerm.toLowerCase();
+                    return (
+                      supplier.name?.toLowerCase().includes(search) ||
+                      supplier.email?.toLowerCase().includes(search) ||
+                      supplier.phone?.toLowerCase().includes(search) ||
+                      supplier.address?.toLowerCase().includes(search) ||
+                      supplier.supplier_types?.name?.toLowerCase().includes(search)
+                    );
+                  })
+                  .map((supplier) => (
                   <Card key={supplier.id} className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
                     <CardContent className="pt-6">
                       <div className="flex justify-between items-start">
