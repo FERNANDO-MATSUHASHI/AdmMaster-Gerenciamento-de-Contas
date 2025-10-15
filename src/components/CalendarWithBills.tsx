@@ -36,6 +36,10 @@ interface Bill {
   status: string;
   attachmentUrl?: string;
   paymentProofUrl?: string;
+  paymentType?: string;
+  checkNumber?: string;
+  bankName?: string;
+  accountHolder?: string;
 }
 
 interface CalendarWithBillsProps {
@@ -240,16 +244,23 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
             </h3>
             
             {getBillsForDate(selectedDate).length > 0 ? (
-              <div className="space-y-3">
+                  <div className="space-y-3">
                 {getBillsForDate(selectedDate).map((bill) => (
                   <div 
                     key={bill.id} 
                     className="p-3 bg-secondary/50 rounded-lg space-y-3"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                      <div className="flex-1 space-y-1">
                         <p className="font-medium">{bill.description}</p>
                         <p className="text-sm text-muted-foreground">{bill.supplier}</p>
+                        {bill.paymentType === 'cheque' && (
+                          <div className="text-xs text-muted-foreground space-y-0.5 pt-1">
+                            {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
+                            {bill.bankName && <p>Banco: {bill.bankName}</p>}
+                            {bill.accountHolder && <p>Titular: {bill.accountHolder}</p>}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-primary">

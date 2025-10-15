@@ -139,7 +139,12 @@ const Dashboard = () => {
           status,
           attachment_url,
           payment_proof_url,
-          suppliers (name)
+          payment_type,
+          check_number,
+          account_holder,
+          bank_id,
+          suppliers (name),
+          banks (name)
         `)
         .order('due_date', { ascending: true });
 
@@ -163,6 +168,10 @@ const Dashboard = () => {
         status: bill.status,
         attachmentUrl: bill.attachment_url,
         paymentProofUrl: bill.payment_proof_url,
+        paymentType: bill.payment_type,
+        checkNumber: bill.check_number,
+        bankName: bill.banks?.name,
+        accountHolder: bill.account_holder,
       })) || [];
       
       // Atualizar status das contas baseado na data atual ANTES de salvar
@@ -635,21 +644,28 @@ const Dashboard = () => {
                     .filter(bill => bill.status === 'overdue')
                     .slice(0, 5)
                     .map((bill) => (
-                    <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                      <div className="flex items-start justify-between mb-1 sm:mb-2">
-                        <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
-                        <Badge variant="destructive" className="text-xs shrink-0">
-                          {format(bill.dueDate, "dd/MM")}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
-                      <p className="font-semibold text-destructive text-xs sm:text-sm">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(bill.amount)}
-                      </p>
-                    </div>
+                     <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                       <div className="flex items-start justify-between mb-1 sm:mb-2">
+                         <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
+                         <Badge variant="destructive" className="text-xs shrink-0">
+                           {format(bill.dueDate, "dd/MM")}
+                         </Badge>
+                       </div>
+                       <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
+                       {bill.paymentType === 'cheque' && (
+                         <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
+                           {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
+                           {bill.bankName && <p>Banco: {bill.bankName}</p>}
+                           {bill.accountHolder && <p>Titular: {bill.accountHolder}</p>}
+                         </div>
+                       )}
+                       <p className="font-semibold text-destructive text-xs sm:text-sm">
+                         {new Intl.NumberFormat('pt-BR', {
+                           style: 'currency',
+                           currency: 'BRL'
+                         }).format(bill.amount)}
+                       </p>
+                     </div>
                   ))}
                   
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/contas?status=overdue")}>
@@ -671,23 +687,30 @@ const Dashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
-                {upcomingBills.map((bill) => (
-                  <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border">
-                    <div className="flex items-start justify-between mb-1 sm:mb-2">
-                      <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {format(bill.dueDate, "dd/MM")}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
-                    <p className="font-semibold text-primary text-xs sm:text-sm">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(bill.amount)}
-                    </p>
-                  </div>
-                ))}
+                 {upcomingBills.map((bill) => (
+                   <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-secondary/50 border">
+                     <div className="flex items-start justify-between mb-1 sm:mb-2">
+                       <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
+                       <Badge variant="outline" className="text-xs shrink-0">
+                         {format(bill.dueDate, "dd/MM")}
+                       </Badge>
+                     </div>
+                     <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
+                     {bill.paymentType === 'cheque' && (
+                       <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
+                         {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
+                         {bill.bankName && <p>Banco: {bill.bankName}</p>}
+                         {bill.accountHolder && <p>Titular: {bill.accountHolder}</p>}
+                       </div>
+                     )}
+                     <p className="font-semibold text-primary text-xs sm:text-sm">
+                       {new Intl.NumberFormat('pt-BR', {
+                         style: 'currency',
+                         currency: 'BRL'
+                       }).format(bill.amount)}
+                     </p>
+                   </div>
+                 ))}
                 
                 <div className="space-y-2">
                   <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm" onClick={() => navigate("/contas?status=pending")}>

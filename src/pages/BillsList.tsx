@@ -87,7 +87,11 @@ const BillsList = () => {
           payment_type,
           attachment_url,
           payment_proof_url,
-          suppliers (name)
+          check_number,
+          account_holder,
+          bank_id,
+          suppliers (name),
+          banks (name)
         `)
         .order('due_date', { ascending: true });
 
@@ -108,7 +112,10 @@ const BillsList = () => {
         status: bill.status,
         paymentType: bill.payment_type,
         attachmentUrl: bill.attachment_url,
-        payment_proof_url: bill.payment_proof_url
+        payment_proof_url: bill.payment_proof_url,
+        checkNumber: bill.check_number,
+        bankName: bill.banks?.name,
+        accountHolder: bill.account_holder
       })) || [];
       
       // Update status for overdue bills
@@ -517,6 +524,32 @@ const BillsList = () => {
                         {bill.paymentType === 'cheque' ? 'Cheque' : bill.paymentType === 'boleto' ? 'Boleto' : 'Conta'}
                       </span>
                     </div>
+                    
+                    {bill.paymentType === 'cheque' && (
+                      <>
+                        {bill.checkNumber && (
+                          <div className="flex items-center space-x-2">
+                            <Receipt className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">Nº Cheque:</span>
+                            <span className="text-sm font-medium">{bill.checkNumber}</span>
+                          </div>
+                        )}
+                        {bill.bankName && (
+                          <div className="flex items-center space-x-2">
+                            <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">Banco:</span>
+                            <span className="text-sm font-medium">{bill.bankName}</span>
+                          </div>
+                        )}
+                        {bill.accountHolder && (
+                          <div className="flex items-center space-x-2">
+                            <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">Titular:</span>
+                            <span className="text-sm font-medium">{bill.accountHolder}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   
                   {/* Action Buttons */}
