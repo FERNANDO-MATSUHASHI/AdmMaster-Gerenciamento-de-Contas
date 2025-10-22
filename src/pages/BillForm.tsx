@@ -644,7 +644,7 @@ const BillForm = () => {
                       </Popover>
                     </div>
 
-                    {!(formData.paymentType === "boleto" || (formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) > 1)) && (
+                    {formData.paymentType !== "boleto" && formData.paymentType !== "cheque" && (
                       <div>
                         <Label>Data de Vencimento *</Label>
                         <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
