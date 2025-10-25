@@ -33,8 +33,6 @@ const BillForm = () => {
     numeroCheque: "",
     banco: "",
     titularConta: "",
-    numeroConta: "",
-    nomeConta: "",
     // Campos do boleto/cheque parcelado
     quantidadeParcelas: "1",
     parcelasDatas: [new Date()],
@@ -405,8 +403,6 @@ const BillForm = () => {
             check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
             account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
-            account_number: formData.numeroConta || null,
-            account_name: formData.nomeConta || null,
             status: 'pending',
             attachment_url: uploadedUrls[index] || null
           };
@@ -476,8 +472,6 @@ const BillForm = () => {
             check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
             account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
-            account_number: formData.numeroConta || null,
-            account_name: formData.nomeConta || null,
             status: 'pending',
             attachment_url: attachmentUrl
           })
@@ -637,6 +631,7 @@ const BillForm = () => {
                               if (date) handleInputChange("dataEntrada", date);
                               setIsDatePickerOpen(prev => ({ ...prev, entrada: false }));
                             }}
+                            defaultMonth={formData.dataEntrada}
                             initialFocus
                             className="p-3 pointer-events-auto"
                           />
@@ -668,6 +663,7 @@ const BillForm = () => {
                                 if (date) handleInputChange("dataVencimento", date);
                                 setIsDatePickerOpen(prev => ({ ...prev, vencimento: false }));
                               }}
+                              defaultMonth={formData.dataVencimento}
                               initialFocus
                               className="p-3 pointer-events-auto"
                             />
@@ -872,21 +868,22 @@ const BillForm = () => {
                                        {format(data, "dd/MM/yyyy", { locale: ptBR })}
                                      </Button>
                                    </PopoverTrigger>
-                                   <PopoverContent className="w-auto p-0" align="start">
-                                     <Calendar
-                                       mode="single"
-                                       selected={data}
-                                       onSelect={(date) => {
-                                         if (date) handleParcelaDataChange(index, date);
-                                         setIsDatePickerOpen(prev => ({ 
-                                           ...prev, 
-                                           parcelas: { ...prev.parcelas, [index]: false } 
-                                         }));
-                                       }}
-                                       initialFocus
-                                       className="p-3 pointer-events-auto"
-                                     />
-                                   </PopoverContent>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                      <Calendar
+                                        mode="single"
+                                        selected={data}
+                                        onSelect={(date) => {
+                                          if (date) handleParcelaDataChange(index, date);
+                                          setIsDatePickerOpen(prev => ({ 
+                                            ...prev, 
+                                            parcelas: { ...prev.parcelas, [index]: false } 
+                                          }));
+                                        }}
+                                        defaultMonth={data}
+                                        initialFocus
+                                        className="p-3 pointer-events-auto"
+                                      />
+                                    </PopoverContent>
                                  </Popover>
                                </div>
                                <div className="w-32">

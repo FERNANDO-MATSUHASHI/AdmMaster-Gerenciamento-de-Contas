@@ -34,8 +34,6 @@ const BillEdit = () => {
     entry_date: "",
     supplier_id: "",
     check_number: "",
-    account_number: "",
-    account_name: "",
     account_holder: "",
     bank_id: "",
     payment_type: "conta",
@@ -120,8 +118,6 @@ const BillEdit = () => {
         entry_date: data.entry_date || "",
         supplier_id: data.supplier_id || "",
         check_number: data.check_number || "",
-        account_number: data.account_number || "",
-        account_name: data.account_name || "",
         account_holder: data.account_holder || "",
         bank_id: data.bank_id || "",
         payment_type: data.payment_type || "conta",
@@ -353,8 +349,6 @@ const BillEdit = () => {
           entry_date: formData.entry_date,
           supplier_id: formData.supplier_id || null,
           check_number: formData.payment_type === 'cheque' ? formData.check_number || null : null,
-          account_number: formData.account_number || null,
-          account_name: formData.account_name || null,
           account_holder: formData.payment_type === 'cheque' ? formData.account_holder || null : null,
           bank_id: formData.payment_type === 'cheque' ? formData.bank_id || null : null,
           payment_type: formData.payment_type,
@@ -425,7 +419,7 @@ const BillEdit = () => {
                   />
                 </div>
 
-                {formData.payment_type !== "boleto" && formData.payment_type !== "cheque" && (
+                {formData.payment_type !== "boleto" && (
                   <div>
                     <Label>Data de Vencimento *</Label>
                     <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
@@ -652,24 +646,6 @@ const BillEdit = () => {
                         value={formData.account_holder}
                         onChange={(e) => setFormData({ ...formData, account_holder: e.target.value })}
                         required={formData.payment_type === "cheque"}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="account_number">Número da Conta</Label>
-                      <Input
-                        id="account_number"
-                        value={formData.account_number}
-                        onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="account_name">Nome da Conta</Label>
-                      <Input
-                        id="account_name"
-                        value={formData.account_name}
-                        onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
                       />
                     </div>
                   </div>
