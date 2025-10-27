@@ -28,7 +28,7 @@ const BillForm = () => {
     valor: "",
     fornecedor: "",
     dataEntrada: new Date(),
-    dataVencimento: new Date(),
+    dataVencimento: addMonths(new Date(), 1),
     paymentType: "conta",
     numeroCheque: "",
     banco: "",
@@ -302,16 +302,32 @@ const BillForm = () => {
       const parcelas = parseInt(formData.quantidadeParcelas) || 1;
       const valorParcela = valor / parcelas;
       
+      // Definir data de vencimento para um mês à frente
+      const dataVencimentoUmMesAFrente = addMonths(new Date(), 1);
+      
+      // Criar array de datas das parcelas
+      const novasParcelas: Date[] = [];
+      for (let i = 0; i < parcelas; i++) {
+        novasParcelas.push(addMonths(dataVencimentoUmMesAFrente, i));
+      }
+      
       // Inicializar valores das parcelas se necessário
       if (formData.parcelasValores.length === 0 || formData.parcelasValores.every(v => v === 0)) {
         const novosValores = Array(parcelas).fill(valorParcela);
         setFormData(prev => ({
           ...prev,
           paymentType: tipo,
+          dataVencimento: dataVencimentoUmMesAFrente,
+          parcelasDatas: novasParcelas,
           parcelasValores: novosValores
         }));
       } else {
-        handleInputChange("paymentType", tipo);
+        setFormData(prev => ({
+          ...prev,
+          paymentType: tipo,
+          dataVencimento: dataVencimentoUmMesAFrente,
+          parcelasDatas: novasParcelas
+        }));
       }
     } else {
       handleInputChange("paymentType", tipo);
@@ -577,7 +593,7 @@ const BillForm = () => {
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o fornecedor" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="popper" side="bottom" align="start" className="max-h-[300px]">
                           {suppliers.map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
                               {supplier.name}
