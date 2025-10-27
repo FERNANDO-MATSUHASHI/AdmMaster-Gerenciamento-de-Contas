@@ -178,21 +178,36 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
 
                   {/* Bills - Simplified for mobile */}
                   <div className="flex-1 overflow-hidden">
-                    {/* Mobile: Just show indicator dots */}
+                    {/* Mobile: Show indicator dots with status colors */}
                     <div className="sm:hidden">
                       {dayBills.length > 0 && (
-                        <div className="flex justify-center">
-                          <div className="w-2 h-2 bg-primary rounded-full" />
+                        <div className="flex justify-center gap-0.5">
+                          {dayBills.slice(0, 3).map((bill) => (
+                            <div 
+                              key={bill.id}
+                              className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                bill.status === 'paid' && "bg-success",
+                                bill.status === 'overdue' && "bg-destructive",
+                                bill.status === 'pending' && "bg-primary"
+                              )} 
+                            />
+                          ))}
                         </div>
                       )}
                     </div>
 
-                    {/* Desktop: Show bill details */}
+                    {/* Desktop: Show bill details with status colors */}
                     <div className="hidden sm:block space-y-1">
                       {dayBills.slice(0, 3).map((bill) => (
                         <div
                           key={bill.id}
-                          className="text-xs p-1 rounded bg-primary/10 text-primary truncate"
+                          className={cn(
+                            "text-xs p-1 rounded truncate",
+                            bill.status === 'paid' && "bg-success/20 text-success",
+                            bill.status === 'overdue' && "bg-destructive/20 text-destructive",
+                            bill.status === 'pending' && "bg-primary/10 text-primary"
+                          )}
                           title={`${bill.description} - ${bill.supplier} - ${new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
                             currency: 'BRL'
@@ -202,7 +217,7 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
                             <Clock className="h-2 w-2" />
                             <span className="truncate">{bill.description}</span>
                           </div>
-                          <div className="truncate text-muted-foreground">
+                          <div className="truncate opacity-80">
                             {new Intl.NumberFormat('pt-BR', {
                               style: 'currency',
                               currency: 'BRL'
