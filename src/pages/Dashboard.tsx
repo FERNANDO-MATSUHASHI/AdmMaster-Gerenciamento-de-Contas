@@ -48,7 +48,8 @@ const Dashboard = () => {
     pendingBills: 0,
     overdueBills: 0,
     totalAmount: 0,
-    paidBills: 0
+    paidBills: 0,
+    paidBillsTotal: 0
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
@@ -105,9 +106,14 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchBills();
-    fetchStats();
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (selectedDate) {
+      fetchStats(selectedDate);
+    }
+  }, [selectedDate]);
 
   const fetchUserProfile = async () => {
     try {
@@ -206,7 +212,7 @@ const Dashboard = () => {
     }
   };
 
-  const fetchStats = async () => {
+  const fetchStats = async (referenceDate: Date = new Date()) => {
     try {
       const { data: bills } = await supabase
         .from('bills')
@@ -222,26 +228,76 @@ const Dashboard = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
+        // Get selected month and year from reference date
+        const selectedMonth = referenceDate.getMonth();
+        const selectedYear = referenceDate.getFullYear();
+        
         const billsWithUpdatedStatus = bills.map(bill => {
           const billDate = parseLocalDate(bill.due_date);
           billDate.setHours(0, 0, 0, 0);
           
           if (bill.status === 'pending' && billDate < today) {
-            return { ...bill, status: 'overdue' };
+            return { ...bill, status: 'overdue', dueDate: billDate };
           }
-          return bill;
+          return { ...bill, dueDate: billDate };
         });
 
-        const totalAmount = billsWithUpdatedStatus.reduce((sum, bill) => sum + Number(bill.amount), 0);
-        const paidBills = billsWithUpdatedStatus.filter(bill => bill.status === 'paid').length;
-        const pendingBills = billsWithUpdatedStatus.filter(bill => bill.status === 'pending').length;
-        const overdueBills = billsWithUpdatedStatus.filter(bill => bill.status === 'overdue').length;
+        // Contas a Vencer: contas pendentes do mês selecionado com vencimento >= hoje
+        const pendingBills = billsWithUpdatedStatus.filter(bill => {
+          const billMonth = bill.dueDate.getMonth();
+          const billYear = bill.dueDate.getFullYear();
+          return bill.status === 'pending' && 
+                 bill.dueDate >= today &&
+                 billMonth === selectedMonth &&
+                 billYear === selectedYear;
+        }).length;
+        
+        // Contas Vencidas: contas com status overdue do mês selecionado
+        const overdueBills = billsWithUpdatedStatus.filter(bill => {
+          const billMonth = bill.dueDate.getMonth();
+          const billYear = bill.dueDate.getFullYear();
+          return bill.status === 'overdue' &&
+                 billMonth === selectedMonth &&
+                 billYear === selectedYear;
+        }).length;
+        
+        // Total do Mês: soma das contas pendentes e vencidas do mês selecionado
+        const totalAmount = billsWithUpdatedStatus
+          .filter(bill => {
+            const billMonth = bill.dueDate.getMonth();
+            const billYear = bill.dueDate.getFullYear();
+            return billMonth === selectedMonth && 
+                   billYear === selectedYear && 
+                   (bill.status === 'pending' || bill.status === 'overdue');
+          })
+          .reduce((sum, bill) => sum + Number(bill.amount), 0);
+        
+        // Contas Pagas: contas pagas do mês selecionado
+        const paidBills = billsWithUpdatedStatus.filter(bill => {
+          const billMonth = bill.dueDate.getMonth();
+          const billYear = bill.dueDate.getFullYear();
+          return bill.status === 'paid' &&
+                 billMonth === selectedMonth &&
+                 billYear === selectedYear;
+        }).length;
+        
+        // Total das Contas Pagas: soma dos valores das contas pagas do mês selecionado
+        const paidBillsTotal = billsWithUpdatedStatus
+          .filter(bill => {
+            const billMonth = bill.dueDate.getMonth();
+            const billYear = bill.dueDate.getFullYear();
+            return bill.status === 'paid' &&
+                   billMonth === selectedMonth &&
+                   billYear === selectedYear;
+          })
+          .reduce((sum, bill) => sum + Number(bill.amount), 0);
         
         setStats({
           pendingBills,
           overdueBills,
           totalAmount,
-          paidBills
+          paidBills,
+          paidBillsTotal
         });
       }
     } catch (error) {
@@ -307,7 +363,7 @@ const Dashboard = () => {
       });
 
       fetchBills();
-      fetchStats();
+      fetchStats(selectedDate || new Date());
     } catch (error) {
       console.error('Erro ao excluir conta:', error);
       toast({
@@ -333,7 +389,7 @@ const Dashboard = () => {
       });
 
       fetchBills();
-      fetchStats();
+      fetchStats(selectedDate || new Date());
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast({
@@ -395,7 +451,7 @@ const Dashboard = () => {
       });
 
       fetchBills();
-      fetchStats();
+      fetchStats(selectedDate || new Date());
       setPaymentProofConfirmDialog(false);
       setSelectedPaymentProof(null);
     } catch (error) {
@@ -446,7 +502,10 @@ const Dashboard = () => {
     },
     {
       title: "Pagas",
-      value: stats.paidBills.toString(),
+      value: `${stats.paidBills} (${new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(stats.paidBillsTotal)})`,
       icon: TrendingUp,
       color: "text-success",
       bgColor: "bg-success/10"
@@ -621,6 +680,7 @@ const Dashboard = () => {
               onMarkAsPaid={handleMarkAsPaid}
               onViewAttachment={handleViewAttachment}
               onUploadPaymentProof={handleUploadPaymentProof}
+              onMonthChange={setSelectedDate}
             />
             </CardContent>
           </Card>

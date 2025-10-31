@@ -51,6 +51,7 @@ interface CalendarWithBillsProps {
   onViewAttachment?: (attachmentUrl: string) => void;
   onUploadPaymentProof?: (billId: string) => void;
   isUpdating?: boolean;
+  onMonthChange?: (date: Date) => void;
 }
 
 export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({ 
@@ -61,7 +62,8 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
   onMarkAsPaid,
   onViewAttachment,
   onUploadPaymentProof,
-  isUpdating = false
+  isUpdating = false,
+  onMonthChange
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -104,11 +106,15 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
   };
 
   const handlePreviousMonth = () => {
-    setCurrentDate(subMonths(currentDate, 1));
+    const newDate = subMonths(currentDate, 1);
+    setCurrentDate(newDate);
+    onMonthChange?.(newDate);
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(addMonths(currentDate, 1));
+    const newDate = addMonths(currentDate, 1);
+    setCurrentDate(newDate);
+    onMonthChange?.(newDate);
   };
 
   return (

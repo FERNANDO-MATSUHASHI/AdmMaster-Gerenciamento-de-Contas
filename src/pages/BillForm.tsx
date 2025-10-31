@@ -254,10 +254,12 @@ const BillForm = () => {
   const handleQuantidadeParcelasChange = (quantidade: string) => {
     const num = parseInt(quantidade) || 1;
     const novasParcelas: Date[] = [];
-    const novosValores: number[] = [];
     const novosNumerosCheque: string[] = [];
+    const novosValores: number[] = [];
     const valor = parseFloat(formData.valor) || 0;
-    const valorParcela = valor / num; // Calcular com a nova quantidade
+    
+    // Se for 1 parcela, calcular automaticamente; senão, inicializar com 0
+    const valorParcela = num === 1 ? parseFloat((valor / num).toFixed(2)) : 0;
     
     for (let i = 0; i < num; i++) {
       novasParcelas.push(addMonths(formData.dataVencimento, i));
@@ -279,20 +281,45 @@ const BillForm = () => {
     setSelectedFiles(novosArquivos);
   };
 
-  // Função para atualizar o valor total e recalcular as parcelas
-  const handleValorTotalChange = (valor: string) => {
-    const novoValor = parseFloat(valor) || 0;
+  // Função para calcular valores das parcelas quando o botão for clicado
+  const handleCalcularParcelas = () => {
+    const valor = parseFloat(formData.valor) || 0;
     const parcelas = parseInt(formData.quantidadeParcelas) || 1;
-    const valorParcela = (novoValor / parcelas);
+    const valorParcela = parseFloat((valor / parcelas).toFixed(2));
     
-    // Criar array com o número correto de parcelas, todas com o valor calculado
     const novosValores = Array(parcelas).fill(valorParcela);
     
     setFormData(prev => ({
       ...prev,
-      valor: valor,
       parcelasValores: novosValores
     }));
+
+    toast({
+      title: "Parcelas calculadas",
+      description: `${parcelas} parcela(s) de R$ ${valorParcela}`,
+    });
+  };
+
+  // Função para atualizar o valor total
+  const handleValorTotalChange = (valor: string) => {
+    const parcelas = parseInt(formData.quantidadeParcelas) || 1;
+    
+    // Se for 1 parcela, recalcular automaticamente
+    if (parcelas === 1) {
+      const novoValor = parseFloat(valor) || 0;
+      const valorParcela = parseFloat((novoValor / parcelas).toFixed(2));
+      
+      setFormData(prev => ({
+        ...prev,
+        valor: valor,
+        parcelasValores: [valorParcela]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        valor: valor
+      }));
+    }
   };
 
   // Função para sincronizar valores quando mudar para tipo boleto ou cheque
@@ -300,7 +327,6 @@ const BillForm = () => {
     if (tipo === "boleto" || tipo === "cheque") {
       const valor = parseFloat(formData.valor) || 0;
       const parcelas = parseInt(formData.quantidadeParcelas) || 1;
-      const valorParcela = valor / parcelas;
       
       // Definir data de vencimento para um mês à frente
       const dataVencimentoUmMesAFrente = addMonths(new Date(), 1);
@@ -311,24 +337,17 @@ const BillForm = () => {
         novasParcelas.push(addMonths(dataVencimentoUmMesAFrente, i));
       }
       
-      // Inicializar valores das parcelas se necessário
-      if (formData.parcelasValores.length === 0 || formData.parcelasValores.every(v => v === 0)) {
-        const novosValores = Array(parcelas).fill(valorParcela);
-        setFormData(prev => ({
-          ...prev,
-          paymentType: tipo,
-          dataVencimento: dataVencimentoUmMesAFrente,
-          parcelasDatas: novasParcelas,
-          parcelasValores: novosValores
-        }));
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          paymentType: tipo,
-          dataVencimento: dataVencimentoUmMesAFrente,
-          parcelasDatas: novasParcelas
-        }));
-      }
+      // Se for 1 parcela, calcular automaticamente; senão, inicializar com 0
+      const valorParcela = parcelas === 1 ? parseFloat((valor / parcelas).toFixed(2)) : 0;
+      const novosValores = Array(parcelas).fill(valorParcela);
+      
+      setFormData(prev => ({
+        ...prev,
+        paymentType: tipo,
+        dataVencimento: dataVencimentoUmMesAFrente,
+        parcelasDatas: novasParcelas,
+        parcelasValores: novosValores
+      }));
     } else {
       handleInputChange("paymentType", tipo);
     }
@@ -347,7 +366,32 @@ const BillForm = () => {
   // Função para atualizar valor específico de uma parcela
   const handleParcelaValorChange = (index: number, valor: string) => {
     const novosValores = [...formData.parcelasValores];
-    novosValores[index] = parseFloat(valor) || 0;
+    
+    // Permite edição livre durante a digitação
+    // Aceita números, ponto decimal e até 2 casas decimais
+    const numericValue = valor.replace(/[^\d.]/g, '');
+    
+    // Limita a apenas um ponto decimal
+    const parts = numericValue.split('.');
+    let formattedValue = parts[0];
+    if (parts.length > 1) {
+      formattedValue += '.' + parts.slice(1).join('').slice(0, 2);
+    }
+    
+    // Armazena como número ou 0 se vazio
+    novosValores[index] = formattedValue === "" ? 0 : parseFloat(formattedValue) || 0;
+    
+    setFormData(prev => ({
+      ...prev,
+      parcelasValores: novosValores
+    }));
+  };
+
+  // Função para formatar o valor quando o campo perde o foco
+  const handleParcelaValorBlur = (index: number) => {
+    const novosValores = [...formData.parcelasValores];
+    const valor = parseFloat(String(novosValores[index])) || 0;
+    novosValores[index] = parseFloat(valor.toFixed(2));
     setFormData(prev => ({
       ...prev,
       parcelasValores: novosValores
@@ -802,44 +846,33 @@ const BillForm = () => {
                       {formData.paymentType === "boleto" ? "Dados do Boleto" : "Dados do Cheque"}
                     </h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="quantidadeParcelas">Quantidade de Parcelas *</Label>
-                        <Input
-                          id="quantidadeParcelas"
-                          type="number"
-                          min="1"
-                          placeholder="1"
-                          value={formData.quantidadeParcelas}
-                          onChange={(e) => handleQuantidadeParcelasChange(e.target.value)}
-                          required={formData.paymentType === "boleto" || formData.paymentType === "cheque"}
-                        />
-                      </div>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="quantidadeParcelas">Quantidade de Parcelas *</Label>
+                          <Input
+                            id="quantidadeParcelas"
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={formData.quantidadeParcelas}
+                            onChange={(e) => handleQuantidadeParcelasChange(e.target.value)}
+                            required={formData.paymentType === "boleto" || formData.paymentType === "cheque"}
+                          />
+                        </div>
 
-                      <div>
-                        <Label htmlFor="valorParcela">Valor da Parcela</Label>
-                        <Input
-                          id="valorParcela"
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          value={calcularValorParcela()}
-                          onChange={(e) => {
-                            const novoValorParcela = parseFloat(e.target.value) || 0;
-                            const parcelas = parseInt(formData.quantidadeParcelas) || 1;
-                            const valorTotal = (novoValorParcela * parcelas).toFixed(2);
-                            
-                            // Atualizar o valor total
-                            handleInputChange("valor", valorTotal);
-                            
-                            // Atualizar todos os valores das parcelas
-                            const novosValores = formData.parcelasValores.map(() => novoValorParcela);
-                            setFormData(prev => ({
-                              ...prev,
-                              parcelasValores: novosValores
-                            }));
-                          }}
-                        />
+                        {parseInt(formData.quantidadeParcelas) >= 2 && (
+                          <div className="flex items-end">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={handleCalcularParcelas}
+                              className="w-full"
+                            >
+                              Calcular Parcelas
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -902,15 +935,16 @@ const BillForm = () => {
                                     </PopoverContent>
                                  </Popover>
                                </div>
-                               <div className="w-32">
-                                 <Input
-                                   type="number"
-                                   step="0.01"
-                                   placeholder="Valor"
-                                   value={formData.parcelasValores[index] !== undefined && formData.parcelasValores[index] > 0 ? formData.parcelasValores[index].toFixed(2) : calcularValorParcela()}
-                                   onChange={(e) => handleParcelaValorChange(index, e.target.value)}
-                                 />
-                               </div>
+                                 <div className="w-32">
+                                   <Input
+                                     type="number"
+                                     step="0.01"
+                                     placeholder="0.00"
+                                     value={formData.parcelasValores[index] || ""}
+                                     onChange={(e) => handleParcelaValorChange(index, e.target.value)}
+                                     onBlur={() => handleParcelaValorBlur(index)}
+                                   />
+                                 </div>
                              </div>
                              
                               {/* Anexo para cada parcela quando há 2 ou mais parcelas */}

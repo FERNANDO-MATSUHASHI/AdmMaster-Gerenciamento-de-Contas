@@ -84,6 +84,8 @@ const SupplierTypes = () => {
         title: "Sucesso",
         description: "Tipo de fornecedor criado com sucesso!",
       });
+
+      navigate("/dashboard");
     } catch (error) {
       console.error('Erro ao criar tipo:', error);
       toast({

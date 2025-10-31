@@ -122,23 +122,7 @@ const SupplierForm = () => {
     }
 
     if (result) {
-      // Reset form and fetch suppliers
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        cnpj: "",
-        type_id: "",
-        cep: "",
-        logradouro: "",
-        numero: "",
-        bairro: "",
-        cidade: "",
-        estado: ""
-      });
-      setShowForm(false);
-      setEditingSupplier(null);
-      fetchSuppliers();
+      navigate("/dashboard");
     }
   };
 
