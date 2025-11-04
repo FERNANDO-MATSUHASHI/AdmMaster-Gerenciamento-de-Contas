@@ -21,7 +21,7 @@ const BankForm = () => {
     const result = await createBank(formData.name);
     
     if (result) {
-      navigate("/bancos");
+      navigate("/dashboard");
     }
   };
 

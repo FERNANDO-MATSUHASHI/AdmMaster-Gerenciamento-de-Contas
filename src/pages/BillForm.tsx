@@ -547,7 +547,7 @@ const BillForm = () => {
         });
       }
       
-      navigate("/contas");
+      navigate("/dashboard");
     } catch (error: any) {
       console.error('Error saving bill:', error);
       toast({
