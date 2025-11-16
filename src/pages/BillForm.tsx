@@ -510,8 +510,8 @@ const BillForm = () => {
       } else {
         // Save single bill to database
         // Formatar datas sem conversão de timezone
-        // Para boleto com 1 parcela, usar a data da primeira parcela ao invés de dataVencimento
-        const dueDate = formData.paymentType === 'boleto' && parseInt(formData.quantidadeParcelas) === 1
+        // Para boleto ou cheque com 1 parcela, usar a data da primeira parcela ao invés de dataVencimento
+        const dueDate = (formData.paymentType === 'boleto' || formData.paymentType === 'cheque') && parseInt(formData.quantidadeParcelas) === 1
           ? new Date(formData.parcelasDatas[0])
           : new Date(formData.dataVencimento);
         const entryDate = new Date(formData.dataEntrada);
