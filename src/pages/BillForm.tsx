@@ -15,11 +15,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { translateErrorMessage } from "@/lib/errorMessages";
+import { getExpenseUsers, ExpenseUser } from "@/lib/expenseUsers";
 
 const BillForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Array<{id: string, name: string}>>([]);
   const [banks, setBanks] = useState<Array<{id: string, name: string}>>([]);
+  const [expenseUsersList, setExpenseUsersList] = useState<ExpenseUser[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -235,6 +237,10 @@ const BillForm = () => {
         } else {
           setBanks(banksData || []);
         }
+
+        // Load expense users
+        const users = await getExpenseUsers();
+        setExpenseUsersList(users);
       } catch (error) {
         console.error('Error loading data:', error);
       }
@@ -462,7 +468,7 @@ const BillForm = () => {
           payment_type: formData.paymentType,
             check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
-            account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
+            account_holder: formData.titularConta || null,
             status: 'pending',
             attachment_url: uploadedUrls[index] || null
           };
@@ -531,7 +537,7 @@ const BillForm = () => {
             payment_type: formData.paymentType,
             check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
-            account_holder: formData.paymentType === 'cheque' ? formData.titularConta || null : null,
+            account_holder: formData.titularConta || null,
             status: 'pending',
             attachment_url: attachmentUrl
           })
@@ -611,7 +617,7 @@ const BillForm = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <Label htmlFor="valor">Valor *</Label>
                       <Input
@@ -641,6 +647,36 @@ const BillForm = () => {
                           {suppliers.map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
                               {supplier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="titularConta">Pessoa / Usuário</Label>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => navigate("/usuarios-despesas")}
+                          className="h-auto p-0 text-xs text-primary hover:underline"
+                        >
+                          + Gerenciar
+                        </Button>
+                      </div>
+                      <Select 
+                        value={formData.titularConta} 
+                        onValueChange={(value) => handleInputChange("titularConta", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Ex: Fernando, Luciane..." />
+                        </SelectTrigger>
+                        <SelectContent position="popper" side="bottom" align="start" className="max-h-[300px]">
+                          {expenseUsersList.map((user) => (
+                            <SelectItem key={user.id} value={user.name}>
+                              {user.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

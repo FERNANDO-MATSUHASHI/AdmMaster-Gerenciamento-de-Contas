@@ -16,35 +16,48 @@ import BankForm from "./pages/BankForm";
 import BanksList from "./pages/BanksList";
 import BankEdit from "./pages/BankEdit";
 import SupplierTypes from "./pages/SupplierTypes";
+import ExpenseUsers from "./pages/ExpenseUsers";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
+
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/perfil" element={<Profile />} />
-          <Route path="/fornecedores/novo" element={<SupplierForm />} />
-          <Route path="/contas/nova" element={<BillForm />} />
-          <Route path="/contas/editar/:id" element={<BillEdit />} />
-          <Route path="/conta/:id" element={<BillDetail />} />
-          <Route path="/contas" element={<BillsList />} />
-          <Route path="/bancos" element={<BanksList />} />
-          <Route path="/bancos/novo" element={<BankForm />} />
-          <Route path="/bancos/editar/:id" element={<BankEdit />} />
-          <Route path="/tipos-fornecedor" element={<SupplierTypes />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/fornecedores/novo" element={<ProtectedRoute><SupplierForm /></ProtectedRoute>} />
+              <Route path="/contas/nova" element={<ProtectedRoute><BillForm /></ProtectedRoute>} />
+              <Route path="/contas/editar/:id" element={<ProtectedRoute><BillEdit /></ProtectedRoute>} />
+              <Route path="/conta/:id" element={<ProtectedRoute><BillDetail /></ProtectedRoute>} />
+              <Route path="/contas" element={<ProtectedRoute><BillsList /></ProtectedRoute>} />
+              <Route path="/bancos" element={<ProtectedRoute><BanksList /></ProtectedRoute>} />
+              <Route path="/bancos/novo" element={<ProtectedRoute><BankForm /></ProtectedRoute>} />
+              <Route path="/bancos/editar/:id" element={<ProtectedRoute><BankEdit /></ProtectedRoute>} />
+              <Route path="/tipos-fornecedor" element={<ProtectedRoute><SupplierTypes /></ProtectedRoute>} />
+              <Route path="/usuarios-despesas" element={<ProtectedRoute><ExpenseUsers /></ProtectedRoute>} />
+              <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

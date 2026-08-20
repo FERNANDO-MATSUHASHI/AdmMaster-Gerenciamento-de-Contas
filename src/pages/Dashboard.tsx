@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { CalendarWithBills } from "@/components/CalendarWithBills";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,19 @@ import {
   Landmark,
   Eye,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Users,
+  BarChart3
 } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { cn, capitalizeFirst, safeParseDate, safeFormatDate } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { getExpenseUsers } from "@/lib/expenseUsers";
+import { useExpenseUsers } from "@/hooks/useExpenseUsers";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +46,7 @@ declare global {
 }
 
 const Dashboard = () => {
+  const { getUserBadgeStyle } = useExpenseUsers();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [allBills, setAllBills] = useState<any[]>([]);
   const [upcomingBills, setUpcomingBills] = useState<any[]>([]);
@@ -51,23 +58,34 @@ const Dashboard = () => {
     paidBills: 0,
     paidBillsTotal: 0
   });
+  const [userBreakdown, setUserBreakdown] = useState<Array<{ name: string; total: number; count: number; color?: string }>>([]);
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
   const [selectedPaymentProof, setSelectedPaymentProof] = useState<{file: File, billId: string} | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const navigate = useNavigate();
 
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Auto-logout após 10 minutos de inatividade
   const resetTimer = useCallback(() => {
-    clearTimeout(window.inactivityTimer);
-    window.inactivityTimer = setTimeout(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
       handleLogout();
     }, 10 * 60 * 1000); // 10 minutos
   }, []);
 
+  const { signOut } = useAuth();
+
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      await signOut();
       toast({
         title: "Logout realizado",
         description: "Sessão encerrada com sucesso.",
@@ -100,7 +118,9 @@ const Dashboard = () => {
       events.forEach(event => {
         document.removeEventListener(event, resetTimerHandler, true);
       });
-      clearTimeout(window.inactivityTimer);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
     };
   }, [resetTimer]);
 
@@ -156,19 +176,10 @@ const Dashboard = () => {
 
       if (allBillsError) throw allBillsError;
 
-      // Parse Supabase date (YYYY-MM-DD) as local date to avoid timezone shift
-      const parseLocalDate = (dateStr: string) => {
-        const [year, month, day] = (dateStr || "").split("-").map(Number);
-        return new Date(year, (month || 1) - 1, day || 1);
-      };
-
       const formattedAllBills = allBillsData?.map((bill) => ({
         id: bill.id,
         description: bill.description,
-        dueDate:
-          typeof bill.due_date === "string"
-            ? parseLocalDate(bill.due_date)
-            : new Date(bill.due_date),
+        dueDate: safeParseDate(bill.due_date),
         amount: bill.amount,
         supplier: bill.suppliers?.name || "Sem fornecedor",
         status: bill.status,
@@ -216,24 +227,17 @@ const Dashboard = () => {
     try {
       const { data: bills } = await supabase
         .from('bills')
-        .select('amount, status, due_date');
+        .select('amount, status, due_date, account_holder');
 
       if (bills) {
-        // Parse dates and update status for overdue bills
-        const parseLocalDate = (dateStr: string) => {
-          const [year, month, day] = (dateStr || "").split("-").map(Number);
-          return new Date(year, (month || 1) - 1, day || 1);
-        };
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Get selected month and year from reference date
         const selectedMonth = referenceDate.getMonth();
         const selectedYear = referenceDate.getFullYear();
         
         const billsWithUpdatedStatus = bills.map(bill => {
-          const billDate = parseLocalDate(bill.due_date);
+          const billDate = safeParseDate(bill.due_date);
           billDate.setHours(0, 0, 0, 0);
           
           if (bill.status === 'pending' && billDate < today) {
@@ -299,6 +303,34 @@ const Dashboard = () => {
           paidBills,
           paidBillsTotal
         });
+
+        // Compute expenses per user for the selected month (all bills in month)
+        const expenseUsers = await getExpenseUsers();
+        const userMap: Record<string, { total: number; count: number; color?: string }> = {};
+
+        expenseUsers.forEach(u => {
+          userMap[u.name] = { total: 0, count: 0, color: u.color };
+        });
+
+        billsWithUpdatedStatus.forEach(bill => {
+          const billMonth = bill.dueDate.getMonth();
+          const billYear = bill.dueDate.getFullYear();
+          if (billMonth === selectedMonth && billYear === selectedYear) {
+            const name = bill.account_holder?.trim() || "Sem Usuário";
+            if (!userMap[name]) {
+              userMap[name] = { total: 0, count: 0, color: "#64748b" };
+            }
+            userMap[name].total += Number(bill.amount);
+            userMap[name].count += 1;
+          }
+        });
+
+        const breakdown = Object.entries(userMap)
+          .map(([name, data]) => ({ name, ...data }))
+          .filter(item => item.count > 0 || expenseUsers.some(u => u.name === item.name))
+          .sort((a, b) => b.total - a.total);
+
+        setUserBreakdown(breakdown);
       }
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -518,6 +550,28 @@ const Dashboard = () => {
         variant="outline" 
         className="w-full justify-start" 
         onClick={() => {
+          navigate("/relatorios");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <BarChart3 className="w-4 h-4 mr-2" />
+        Relatórios
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full justify-start" 
+        onClick={() => {
+          navigate("/usuarios-despesas");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <Users className="w-4 h-4 mr-2" />
+        Usuários
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full justify-start" 
+        onClick={() => {
           navigate("/tipos-fornecedor");
           setMobileMenuOpen(false);
         }}
@@ -585,7 +639,7 @@ const Dashboard = () => {
               <div>
                 <h1 className="text-lg sm:text-xl font-semibold">Gerenciador de Contas</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+                  {capitalizeFirst(format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR }))}
                 </p>
                 {userProfile && (
                   <p className="text-xs text-muted-foreground font-medium">
@@ -597,6 +651,14 @@ const Dashboard = () => {
             
             {/* Desktop Menu */}
             <div className="hidden lg:flex items-center space-x-2">
+              <Button size="sm" variant="outline" onClick={() => navigate("/relatorios")}>
+                <BarChart3 className="w-4 h-4 mr-2 text-primary" />
+                Relatórios
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate("/usuarios-despesas")}>
+                <Users className="w-4 h-4 mr-2" />
+                Usuários
+              </Button>
               <Button size="sm" variant="outline" onClick={() => navigate("/tipos-fornecedor")}>
                 <Plus className="w-4 h-4 mr-2" />
                 Tipos de Fornecedor
@@ -659,6 +721,65 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* Despesas por Usuário no Mês */}
+        {userBreakdown.length > 0 && (
+          <div className="mb-4 sm:mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                Despesas Por Usuário no Mês
+              </h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate("/relatorios")}
+                className="text-xs flex items-center gap-1.5"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                Relatórios
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+              {userBreakdown.map((ub, idx) => {
+                const isSelected = selectedUserFilter === ub.name;
+                return (
+                  <Card 
+                    key={idx} 
+                    onClick={() => setSelectedUserFilter(prev => prev === ub.name ? null : ub.name)}
+                    className={cn(
+                      "border-0 shadow-sm bg-card/60 backdrop-blur-sm hover:bg-card/90 transition-all cursor-pointer relative overflow-hidden",
+                      isSelected && "ring-2 ring-primary bg-primary/10 shadow-md"
+                    )}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between space-x-2 mb-1">
+                        <div className="flex items-center space-x-2 truncate">
+                          <div 
+                            className="w-3 h-3 rounded-full shrink-0" 
+                            style={{ backgroundColor: ub.color || "#3b82f6" }} 
+                          />
+                          <span className="font-semibold text-xs sm:text-sm truncate">{ub.name}</span>
+                        </div>
+                        {isSelected && (
+                          <Badge variant="default" className="text-[9px] px-1 py-0 h-4">
+                            Ver
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-base sm:text-lg font-bold text-primary truncate">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ub.total)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {ub.count} {ub.count === 1 ? 'conta' : 'contas'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Calendar */}
           <Card className="lg:col-span-3 border-0 shadow-lg bg-card/80 backdrop-blur-sm">
@@ -681,6 +802,8 @@ const Dashboard = () => {
               onViewAttachment={handleViewAttachment}
               onUploadPaymentProof={handleUploadPaymentProof}
               onMonthChange={setSelectedDate}
+              selectedUser={selectedUserFilter}
+              onSelectUser={setSelectedUserFilter}
             />
             </CardContent>
           </Card>
@@ -708,7 +831,7 @@ const Dashboard = () => {
                        <div className="flex items-start justify-between mb-1 sm:mb-2">
                          <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
                          <Badge variant="destructive" className="text-xs shrink-0">
-                           {format(bill.dueDate, "dd/MM")}
+                           {safeFormatDate(bill.dueDate, "dd/MM")}
                          </Badge>
                        </div>
                        <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
@@ -716,7 +839,18 @@ const Dashboard = () => {
                          <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
                            {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
                            {bill.bankName && <p>Banco: {bill.bankName}</p>}
-                           {bill.accountHolder && <p>Titular: {bill.accountHolder}</p>}
+                           {bill.accountHolder && (
+                              <div className="flex items-center gap-1 pt-0.5">
+                                <span>Titular:</span>
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-[10px] py-0 px-1 font-semibold"
+                                  style={getUserBadgeStyle(bill.accountHolder)}
+                                >
+                                  {bill.accountHolder}
+                                </Badge>
+                              </div>
+                            )}
                          </div>
                        )}
                        <p className="font-semibold text-destructive text-xs sm:text-sm">
@@ -752,7 +886,7 @@ const Dashboard = () => {
                      <div className="flex items-start justify-between mb-1 sm:mb-2">
                        <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
                        <Badge variant="outline" className="text-xs shrink-0">
-                         {format(bill.dueDate, "dd/MM")}
+                         {safeFormatDate(bill.dueDate, "dd/MM")}
                        </Badge>
                      </div>
                      <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
@@ -760,7 +894,18 @@ const Dashboard = () => {
                        <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
                          {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
                          {bill.bankName && <p>Banco: {bill.bankName}</p>}
-                         {bill.accountHolder && <p>Titular: {bill.accountHolder}</p>}
+                         {bill.accountHolder && (
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span>Titular:</span>
+                              <Badge 
+                                variant="outline" 
+                                className="text-[10px] py-0 px-1 font-semibold"
+                                style={getUserBadgeStyle(bill.accountHolder)}
+                              >
+                                {bill.accountHolder}
+                              </Badge>
+                            </div>
+                          )}
                        </div>
                      )}
                      <p className="font-semibold text-primary text-xs sm:text-sm">

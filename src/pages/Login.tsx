@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { translateErrorMessage } from "@/lib/errorMessages";
 import { formatPhoneNumber, unformatPhoneNumber } from "@/lib/phoneFormatter";
 import { useViaCEP } from "@/hooks/useViaCEP";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -33,23 +34,13 @@ const Login = () => {
   const navigate = useNavigate();
   const { fetchAddress, formatCEP, isLoading: isFetchingCEP } = useViaCEP();
 
+  const { user, loading: authLoading } = useAuth();
+
   useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/dashboard');
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/dashboard');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (!authLoading && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +59,8 @@ const Login = () => {
           title: "Login realizado com sucesso!",
           description: "Redirecionando para o dashboard...",
         });
+
+        navigate('/dashboard', { replace: true });
       } else if (mode === 'register') {
         // Verificar se as senhas coincidem
         if (password !== confirmPassword) {
@@ -152,6 +145,14 @@ const Login = () => {
       }
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/20 flex items-center justify-center p-4">

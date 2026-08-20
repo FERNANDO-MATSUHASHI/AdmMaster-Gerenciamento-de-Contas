@@ -15,6 +15,7 @@ import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { translateErrorMessage } from "@/lib/errorMessages";
+import { getExpenseUsers, ExpenseUser } from "@/lib/expenseUsers";
 
 const BillEdit = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const BillEdit = () => {
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [expenseUsersList, setExpenseUsersList] = useState<ExpenseUser[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<(File | null)[]>([null]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -62,6 +64,7 @@ const BillEdit = () => {
   useEffect(() => {
     fetchSuppliers();
     fetchBanks();
+    getExpenseUsers().then(setExpenseUsersList);
     if (id) {
       fetchBill();
     }
@@ -503,6 +506,36 @@ const BillEdit = () => {
                       {suppliers.map((supplier) => (
                         <SelectItem key={supplier.id} value={supplier.id}>
                           {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="account_holder">Pessoa / Usuário da Despesa</Label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => navigate("/usuarios-despesas")}
+                      className="h-auto p-0 text-xs text-primary hover:underline"
+                    >
+                      + Gerenciar
+                    </Button>
+                  </div>
+                  <Select 
+                    value={formData.account_holder || ""} 
+                    onValueChange={(value) => setFormData({ ...formData, account_holder: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ex: Fernando, Luciane..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {expenseUsersList.map((user) => (
+                        <SelectItem key={user.id} value={user.name}>
+                          {user.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

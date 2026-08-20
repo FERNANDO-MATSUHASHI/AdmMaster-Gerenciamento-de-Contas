@@ -48,10 +48,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useBillStatusUpdate } from "@/hooks/useBillStatusUpdate";
 import { translateErrorMessage } from "@/lib/errorMessages";
 import { type BillStatus } from "@/lib/billStatusValidation";
+import { useExpenseUsers } from "@/hooks/useExpenseUsers";
 
 const BillsList = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getUserBadgeStyle } = useExpenseUsers();
   const { updateBillStatus, isUpdating } = useBillStatusUpdate();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
@@ -485,7 +487,18 @@ const BillsList = () => {
               <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <h3 className="font-semibold text-lg">{bill.description}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-lg">{bill.description}</h3>
+                      {bill.accountHolder && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs font-semibold"
+                          style={getUserBadgeStyle(bill.accountHolder)}
+                        >
+                          {bill.accountHolder}
+                        </Badge>
+                      )}
+                    </div>
                     <Badge className={`${getStatusColor(bill.status)} w-fit`}>
                       {getStatusText(bill.status)}
                     </Badge>
@@ -545,7 +558,13 @@ const BillsList = () => {
                           <div className="flex items-center space-x-2">
                             <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             <span className="text-sm text-muted-foreground">Titular:</span>
-                            <span className="text-sm font-medium">{bill.accountHolder}</span>
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs font-semibold"
+                              style={getUserBadgeStyle(bill.accountHolder)}
+                            >
+                              {bill.accountHolder}
+                            </Badge>
                           </div>
                         )}
                       </>
