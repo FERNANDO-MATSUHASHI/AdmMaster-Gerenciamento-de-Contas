@@ -22,12 +22,7 @@ import {
   Printer,
   Download
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import {
   ResponsiveContainer,
   BarChart,
@@ -69,6 +64,7 @@ const Reports: React.FC = () => {
   const [bills, setBills] = useState<BillData[]>([]);
   const [users, setUsers] = useState<ExpenseUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Filters state
   const currentDate = new Date();
@@ -80,15 +76,17 @@ const Reports: React.FC = () => {
   const handlePrint = () => {
     window.print();
   };
+
   const handleExportPDF = async () => {
     const page1 = document.getElementById("report-pdf-page-1");
     const page2 = document.getElementById("report-pdf-page-2");
     if (!page1 || !page2) return;
 
+    setIsExporting(true);
     try {
       toast({
         title: "Gerando PDF...",
-        description: "Aguarde enquanto o PDF sem sobreposições é preparado.",
+        description: "Aguarde enquanto o PDF é preparado.",
       });
 
       const html2canvas = (await import("html2canvas")).default;
@@ -101,44 +99,52 @@ const Reports: React.FC = () => {
       page1.classList.add("is-exporting");
       page2.classList.add("is-exporting");
 
-      // Force Recharts to recalculate clean SVG widths without text overlap
+      // Allow styles to apply and Recharts to re-render
       window.dispatchEvent(new Event("resize"));
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const canvas1 = await html2canvas(page1, {
+      const captureOptions = {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
-      });
+      };
 
-      const canvas2 = await html2canvas(page2, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-      });
+      const canvas1 = await html2canvas(page1, captureOptions);
+      const canvas2 = await html2canvas(page2, captureOptions);
+
+      // A4 dimensions in mm
+      const pdfW = 210;
+      const pdfH = 297;
+      const margin = 10;
+      const usableW = pdfW - margin * 2;
+      const usableH = pdfH - margin * 2;
 
       const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = 210;
-      const pdfHeight = 297;
 
-      // Page 1
-      const img1Data = canvas1.toDataURL("image/jpeg", 0.98);
-      const img1Height = (canvas1.height * pdfWidth) / canvas1.width;
-      pdf.addImage(img1Data, "JPEG", 0, 0, pdfWidth, Math.min(img1Height, pdfHeight));
+      const addPageToPdf = (canvas: HTMLCanvasElement, isFirst: boolean) => {
+        if (!isFirst) pdf.addPage();
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const aspect = canvas.height / canvas.width;
+        let w = usableW;
+        let h = w * aspect;
+        // Scale down if taller than usable height
+        if (h > usableH) {
+          h = usableH;
+          w = h / aspect;
+        }
+        const x = margin + (usableW - w) / 2;
+        pdf.addImage(imgData, "JPEG", x, margin, w, h);
+      };
 
-      // Page 2
-      pdf.addPage();
-      const img2Data = canvas2.toDataURL("image/jpeg", 0.98);
-      const img2Height = (canvas2.height * pdfWidth) / canvas2.width;
-      pdf.addImage(img2Data, "JPEG", 0, 0, pdfWidth, Math.min(img2Height, pdfHeight));
+      addPageToPdf(canvas1, true);
+      addPageToPdf(canvas2, false);
 
       pdf.save(`Relatorio_Contas_${periodText}.pdf`);
 
       toast({
         title: "PDF Gerado!",
-        description: "O arquivo PDF de 2 páginas foi salvo com sucesso.",
+        description: `Relatorio_Contas_${periodText}.pdf salvo com sucesso.`,
       });
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
@@ -148,11 +154,13 @@ const Reports: React.FC = () => {
         variant: "destructive",
       });
     } finally {
-      page1.classList.remove("is-exporting");
-      page2.classList.remove("is-exporting");
+      document.getElementById("report-pdf-page-1")?.classList.remove("is-exporting");
+      document.getElementById("report-pdf-page-2")?.classList.remove("is-exporting");
       window.dispatchEvent(new Event("resize"));
+      setIsExporting(false);
     }
   };
+
 
   // Load data
   useEffect(() => {
@@ -326,54 +334,112 @@ const Reports: React.FC = () => {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 8mm;
+          margin: 12mm 10mm;
         }
         @media print {
-          body {
+          html, body {
             background-color: #ffffff !important;
             color: #0f172a !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
           }
           .print\\:hidden {
             display: none !important;
           }
+          /* Each report page occupies exactly one printed page */
           .pdf-page-container {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
             page-break-after: always !important;
             break-after: page !important;
+            margin-top: 0 !important;
+            padding: 4mm !important;
+            box-sizing: border-box !important;
           }
+          /* Last page: no blank page after it */
+          .pdf-page-container:last-of-type {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+          /* Cards should not break across pages */
+          .pdf-page-container > * {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          /* Reduce chart height for A4 fit */
           .chart-container {
-            height: 300px !important;
+            height: 220px !important;
+            max-height: 220px !important;
           }
+          /* Remove decorative shadows and backgrounds */
           .shadow-md, .shadow-sm {
             box-shadow: none !important;
           }
           .border-0 {
             border: 1px solid #e2e8f0 !important;
           }
+          /* Metric cards: force 2-column grid on print */
+          .print-grid-2 {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          /* Charts side by side on print */
+          .print-grid-charts {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          /* Reduce padding inside cards on print */
+          .print-compact-card .p-4,
+          .print-compact-card .p-6,
+          .print-compact-card .sm\\:p-6 {
+            padding: 8px !important;
+          }
         }
+        /* PDF export canvas sizing */
         .is-exporting {
           background-color: #ffffff !important;
           color: #0f172a !important;
-          padding: 16px !important;
-          width: 820px !important;
+          padding: 12px !important;
+          width: 860px !important;
+          max-width: 860px !important;
           margin: 0 auto !important;
           box-shadow: none !important;
+          box-sizing: border-box !important;
+        }
+        /* Show report header only during PDF export */
+        .is-exporting .is-exporting-header {
+          display: block !important;
+        }
+        /* Force grids side-by-side during export */
+        .is-exporting .export-grid-2 {
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 12px !important;
         }
         .is-exporting .chart-container {
-          height: 270px !important;
+          height: 240px !important;
+          max-height: 240px !important;
         }
         .is-exporting .border-0 {
           border: 1px solid #e2e8f0 !important;
         }
-        .is-exporting .shadow-md, .is-exporting .shadow-sm {
+        .is-exporting .shadow-md, 
+        .is-exporting .shadow-sm {
           box-shadow: none !important;
         }
-        .is-exporting .bg-card\\/80, 
-        .is-exporting .bg-card\\/70, 
-        .is-exporting .bg-card\\/60,
+        .is-exporting .bg-card\/80, 
+        .is-exporting .bg-card\/70, 
+        .is-exporting .bg-card\/60,
         .is-exporting .bg-card {
           background-color: #ffffff !important;
+        }
+        .is-exporting .backdrop-blur-sm {
+          backdrop-filter: none !important;
         }
       `}</style>
       <div className="max-w-7xl mx-auto space-y-6">
@@ -400,25 +466,20 @@ const Reports: React.FC = () => {
           </div>
 
           {/* Action Print / PDF Dropdown */}
-          <div className="print:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="default" className="flex items-center gap-2">
-                  <Printer className="w-4 h-4" />
-                  <span>Imprimir / PDF</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handlePrint} className="cursor-pointer">
-                  <Printer className="w-4 h-4 mr-2" />
-                  Imprimir Relatório
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer">
-                  <Download className="w-4 h-4 mr-2" />
-                  Gerar PDF (Download)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="print:hidden flex items-center gap-2">
+            <Button variant="outline" onClick={handlePrint} className="flex items-center gap-2">
+              <Printer className="w-4 h-4" />
+              <span>Imprimir</span>
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isExporting ? "Gerando..." : "Salvar PDF"}</span>
+            </Button>
           </div>
         </div>
 
@@ -530,7 +591,7 @@ const Reports: React.FC = () => {
           </div>
 
           {/* Metric Cards Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print-grid-2">
             <Card className="border-0 shadow-sm bg-card/70 backdrop-blur-sm">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
@@ -593,7 +654,7 @@ const Reports: React.FC = () => {
           </div>
 
           {/* Charts Grid 1 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print-grid-charts">
             {/* Chart 1: Expense by User */}
             <Card className="border-0 shadow-md bg-card/80 backdrop-blur-sm">
               <CardHeader>
@@ -605,7 +666,7 @@ const Reports: React.FC = () => {
                   Total de valores acumulados por usuário no período selecionado.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-[420px] chart-container">
+              <CardContent className="h-[300px] chart-container">
                 {userChartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     Nenhum dado encontrado para os filtros selecionados.
@@ -652,7 +713,7 @@ const Reports: React.FC = () => {
                   Fornecedores com maior volume de gastos no período.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-[420px] chart-container">
+              <CardContent className="h-[300px] chart-container">
                 {supplierChartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     Nenhum dado encontrado para os filtros selecionados.
@@ -699,7 +760,7 @@ const Reports: React.FC = () => {
           </div>
 
           {/* Charts Grid 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print-grid-charts">
             {/* Chart 3: Monthly Evolution */}
             <Card className="border-0 shadow-md bg-card/80 backdrop-blur-sm">
               <CardHeader>
@@ -711,7 +772,7 @@ const Reports: React.FC = () => {
                   Comparativo mês a mês dos totais de despesas no ano de {selectedYear}.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-[420px] chart-container">
+              <CardContent className="h-[300px] chart-container">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyEvolutionData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -738,7 +799,7 @@ const Reports: React.FC = () => {
                   Proporção entre contas pagas, pendentes e vencidas.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-[420px] chart-container flex flex-col items-center justify-center">
+              <CardContent className="h-[300px] chart-container flex flex-col items-center justify-center">
                 {statusChartData.length === 0 ? (
                   <div className="text-muted-foreground text-sm">Nenhum dado no período.</div>
                 ) : (
