@@ -1,2 +1,10 @@
 # Ignorar dependências do Node.js
 node_modules/
+
+# Ignorar build local (o Coolify/servidor faz o build)
+dist/
+
+# Ignorar variáveis de ambiente locais
+.env
+.env.local
+.env.*.local
