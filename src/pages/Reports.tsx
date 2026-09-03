@@ -184,16 +184,20 @@ const Reports: React.FC = () => {
 
         if (error) throw error;
 
-        const formatted = billsData?.map((b: any) => ({
-          id: b.id,
-          description: b.description,
-          dueDate: new Date(b.due_date + "T00:00:00"),
-          amount: Number(b.amount) || 0,
-          supplier: b.suppliers?.name || "Sem fornecedor",
-          status: b.status,
-          accountHolder: b.account_holder || "Sem Usuário",
-          billType: b.bill_type || "conta",
-        })) || [];
+        const formatted = billsData?.map((b: any) => {
+          const isDespesa = b.bill_type === "despesa" || b.payment_type === "despesa";
+          return {
+            id: b.id,
+            description: b.description,
+            dueDate: new Date(b.due_date + "T00:00:00"),
+            amount: Number(b.amount) || 0,
+            supplier: b.suppliers?.name || "Sem fornecedor",
+            status: b.status,
+            accountHolder: b.account_holder || "Sem Usuário",
+            billType: isDespesa ? "despesa" : "conta",
+            paymentType: b.payment_type || "conta",
+          };
+        }) || [];
 
         setBills(formatted);
       } catch (err) {
@@ -312,7 +316,9 @@ const Reports: React.FC = () => {
     }));
 
     bills
-      .filter((b) => b.dueDate.getFullYear() === selectedYear && (selectedStatus === "all" || b.status === selectedStatus))
+      .filter((b) => b.dueDate.getFullYear() === selectedYear &&
+                     (selectedStatus === "all" || b.status === selectedStatus) &&
+                     (selectedBillType === "all" || b.billType === selectedBillType))
       .forEach((b) => {
         const m = b.dueDate.getMonth();
         if (m >= 0 && m < 12) {
@@ -322,7 +328,7 @@ const Reports: React.FC = () => {
       });
 
     return monthsData;
-  }, [bills, selectedYear, selectedStatus]);
+  }, [bills, selectedYear, selectedStatus, selectedBillType]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
