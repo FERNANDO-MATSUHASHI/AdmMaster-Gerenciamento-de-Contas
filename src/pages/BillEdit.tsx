@@ -440,7 +440,9 @@ const BillEdit = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="description">Descrição *</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label htmlFor="description">Descrição *</Label>
+                  </div>
                   <Input
                     id="description"
                     value={formData.description}
@@ -450,7 +452,9 @@ const BillEdit = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="amount">Valor *</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label htmlFor="amount">Valor *</Label>
+                  </div>
                   <Input
                     id="amount"
                     type="number"
@@ -463,7 +467,9 @@ const BillEdit = () => {
 
                 {formData.payment_type !== "boleto" && formData.bill_type !== "despesa" && formData.payment_type !== "despesa" && (
                   <div>
-                    <Label>Data de Vencimento *</Label>
+                    <div className="h-6 flex items-center mb-1.5">
+                      <Label>Data de Vencimento *</Label>
+                    </div>
                     <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
                       <PopoverTrigger asChild>
                         <Button
@@ -500,7 +506,9 @@ const BillEdit = () => {
                 )}
 
                 <div>
-                  <Label>Data de Lançamento *</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label>Data de Lançamento *</Label>
+                  </div>
                   <Popover open={isDatePickerOpen.entrada} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, entrada: open }))}>
                     <PopoverTrigger asChild>
                       <Button
@@ -536,7 +544,9 @@ const BillEdit = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="supplier_id">Fornecedor</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label htmlFor="supplier_id">Fornecedor</Label>
+                  </div>
                   <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um fornecedor" />
@@ -552,7 +562,7 @@ const BillEdit = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between">
+                  <div className="h-6 flex items-center justify-between mb-1.5">
                     <Label htmlFor="account_holder">Pessoa / Usuário da Despesa</Label>
                     <Button 
                       type="button" 
@@ -582,7 +592,9 @@ const BillEdit = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+                  </div>
                   <Select value={formData.payment_type} onValueChange={(value) => setFormData({ ...formData, payment_type: value })}>
                     <SelectTrigger>
                       <SelectValue />
@@ -597,7 +609,9 @@ const BillEdit = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="status">Status</Label>
+                  <div className="h-6 flex items-center mb-1.5">
+                    <Label htmlFor="status">Status</Label>
+                  </div>
                   <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                     <SelectTrigger>
                       <SelectValue />
