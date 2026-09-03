@@ -117,7 +117,8 @@ const BillsList = () => {
         payment_proof_url: bill.payment_proof_url,
         checkNumber: bill.check_number,
         bankName: bill.banks?.name,
-        accountHolder: bill.account_holder
+        accountHolder: bill.account_holder,
+        billType: (bill.bill_type === 'despesa' || bill.payment_type === 'despesa') ? 'despesa' : 'conta'
       })) || [];
       
       // Update status for overdue bills

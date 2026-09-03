@@ -115,6 +115,8 @@ const BillEdit = () => {
         return new Date(year, month - 1, day);
       };
       
+      const isDespesa = data.bill_type === "despesa" || data.payment_type === "despesa";
+
       setFormData({
         description: data.description || "",
         amount: data.amount?.toString() || "",
@@ -125,8 +127,8 @@ const BillEdit = () => {
         account_holder: data.account_holder || "",
         bank_id: data.bank_id || "",
         payment_type: data.payment_type || "conta",
-        status: data.status || "pending",
-        bill_type: data.bill_type || "conta",
+        status: isDespesa ? "paid" : (data.status || "pending"),
+        bill_type: isDespesa ? "despesa" : "conta",
         quantidadeParcelas: "1",
         parcelasDatas: [data.due_date ? parseLocalDate(data.due_date) : new Date()],
         parcelasValores: [parseFloat(data.amount?.toString() || "0")]
@@ -350,21 +352,23 @@ const BillEdit = () => {
 
       const parsedAmount = parseFloat(String(formData.amount).replace(',', '.'));
 
+      const updateData: any = {
+        description: formData.description,
+        amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+        due_date: dueDateToSave,
+        entry_date: formData.entry_date,
+        supplier_id: formData.supplier_id || null,
+        check_number: formData.payment_type === 'cheque' ? formData.check_number || null : null,
+        account_holder: formData.account_holder || null,
+        bank_id: formData.payment_type === 'cheque' ? formData.bank_id || null : null,
+        payment_type: isDespesa ? 'despesa' : formData.payment_type,
+        status: isDespesa ? 'paid' : formData.status,
+        attachment_url: attachmentUrl || null
+      };
+
       const { error } = await supabase
         .from('bills')
-        .update({
-          description: formData.description,
-          amount: isNaN(parsedAmount) ? 0 : parsedAmount,
-          due_date: dueDateToSave,
-          entry_date: formData.entry_date,
-          supplier_id: formData.supplier_id || null,
-          check_number: formData.payment_type === 'cheque' ? formData.check_number || null : null,
-          account_holder: formData.payment_type === 'cheque' ? formData.account_holder || null : null,
-          bank_id: formData.payment_type === 'cheque' ? formData.bank_id || null : null,
-          payment_type: formData.payment_type,
-          status: formData.status,
-          attachment_url: attachmentUrl || null
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -410,6 +414,30 @@ const BillEdit = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="bg-muted/40 p-3 rounded-lg flex items-center justify-between border">
+                <div>
+                  <Label className="font-semibold text-sm">Tipo de Registro</Label>
+                  <p className="text-xs text-muted-foreground">Alternar entre Conta a Pagar e Despesa</p>
+                </div>
+                <Select 
+                  value={(formData.bill_type === "despesa" || formData.payment_type === "despesa") ? "despesa" : "conta"}
+                  onValueChange={(val) => setFormData(prev => ({
+                    ...prev,
+                    bill_type: val,
+                    payment_type: val === "despesa" ? "despesa" : (prev.payment_type === "despesa" ? "conta" : prev.payment_type),
+                    status: val === "despesa" ? "paid" : prev.status
+                  }))}
+                >
+                  <SelectTrigger className="w-44 bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="conta">Conta a Pagar</SelectItem>
+                    <SelectItem value="despesa">Despesa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="description">Descrição *</Label>

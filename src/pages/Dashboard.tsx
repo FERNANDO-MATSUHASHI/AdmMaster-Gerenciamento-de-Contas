@@ -179,7 +179,7 @@ const Dashboard = () => {
         checkNumber: bill.check_number,
         bankName: bill.banks?.name,
         accountHolder: bill.account_holder,
-        billType: bill.bill_type || 'conta',
+        billType: (bill.bill_type === 'despesa' || bill.payment_type === 'despesa') ? 'despesa' : 'conta',
       })) || [];
       
       // Atualizar status das contas baseado na data atual ANTES de salvar
