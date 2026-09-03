@@ -18,6 +18,7 @@ import BankEdit from "./pages/BankEdit";
 import SupplierTypes from "./pages/SupplierTypes";
 import ExpenseUsers from "./pages/ExpenseUsers";
 import Reports from "./pages/Reports";
+import ExpenseForm from "./pages/ExpenseForm";
 import NotFound from "./pages/NotFound";
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/tipos-fornecedor" element={<ProtectedRoute><SupplierTypes /></ProtectedRoute>} />
               <Route path="/usuarios-despesas" element={<ProtectedRoute><ExpenseUsers /></ProtectedRoute>} />
               <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/despesas/nova" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

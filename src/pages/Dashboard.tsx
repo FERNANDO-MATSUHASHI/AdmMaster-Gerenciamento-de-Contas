@@ -168,6 +168,7 @@ const Dashboard = () => {
           payment_type,
           check_number,
           account_holder,
+          bill_type,
           bank_id,
           suppliers (name),
           banks (name)
@@ -189,6 +190,7 @@ const Dashboard = () => {
         checkNumber: bill.check_number,
         bankName: bill.banks?.name,
         accountHolder: bill.account_holder,
+        billType: bill.bill_type || 'conta',
       })) || [];
       
       // Atualizar status das contas baseado na data atual ANTES de salvar
@@ -611,6 +613,16 @@ const Dashboard = () => {
         <Plus className="w-4 h-4 mr-2" />
         Nova Conta
       </Button>
+      <Button 
+        className="w-full justify-start bg-orange-500 hover:bg-orange-600 text-white" 
+        onClick={() => {
+          navigate("/despesas/nova");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <Plus className="w-4 h-4 mr-2" />
+        Nova Despesa
+      </Button>
       <hr className="border-border" />
       <Button 
         variant="destructive" 
@@ -674,6 +686,10 @@ const Dashboard = () => {
               <Button size="sm" onClick={() => navigate("/contas/nova")}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Conta
+              </Button>
+              <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate("/despesas/nova")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Despesa
               </Button>
               <Button size="sm" variant="destructive" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />

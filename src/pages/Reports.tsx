@@ -44,6 +44,7 @@ interface BillData {
   supplier: string;
   status: string;
   accountHolder?: string;
+  billType?: string;
 }
 
 const MONTH_NAMES = [
@@ -72,6 +73,7 @@ const Reports: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedBillType, setSelectedBillType] = useState<string>("all");
 
   const handlePrint = () => {
     window.print();
@@ -181,6 +183,7 @@ const Reports: React.FC = () => {
             amount,
             status,
             account_holder,
+            bill_type,
             suppliers (name)
           `)
           .order("due_date", { ascending: true });
@@ -194,7 +197,8 @@ const Reports: React.FC = () => {
           amount: Number(b.amount) || 0,
           supplier: b.suppliers?.name || "Sem fornecedor",
           status: b.status,
-          accountHolder: b.account_holder || "Sem Usuário"
+          accountHolder: b.account_holder || "Sem Usuário",
+          billType: b.bill_type || "conta",
         })) || [];
 
         setBills(formatted);
@@ -220,15 +224,16 @@ const Reports: React.FC = () => {
     return Array.from(yearsSet).sort((a, b) => b - a);
   }, [bills]);
 
-  // Filtered Bills by selected period & status
+  // Filtered Bills by selected period & status & type
   const filteredBills = useMemo(() => {
     return bills.filter((b) => {
       const yearMatches = b.dueDate.getFullYear() === selectedYear;
       const monthMatches = periodMode === "year" || b.dueDate.getMonth() === selectedMonth;
       const statusMatches = selectedStatus === "all" || b.status === selectedStatus;
-      return yearMatches && monthMatches && statusMatches;
+      const typeMatches = selectedBillType === "all" || b.billType === selectedBillType;
+      return yearMatches && monthMatches && statusMatches && typeMatches;
     });
-  }, [bills, periodMode, selectedMonth, selectedYear, selectedStatus]);
+  }, [bills, periodMode, selectedMonth, selectedYear, selectedStatus, selectedBillType]);
 
   // Summary Metrics
   const summary = useMemo(() => {
@@ -545,10 +550,23 @@ const Reports: React.FC = () => {
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as Contas</SelectItem>
+                      <SelectItem value="all">Todos os Status</SelectItem>
                       <SelectItem value="paid">Pagas</SelectItem>
                       <SelectItem value="pending">Pendentes</SelectItem>
                       <SelectItem value="overdue">Vencidas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-36">
+                  <Select value={selectedBillType} onValueChange={setSelectedBillType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Tipos</SelectItem>
+                      <SelectItem value="conta">Somente Contas</SelectItem>
+                      <SelectItem value="despesa">Somente Despesas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
