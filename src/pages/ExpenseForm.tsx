@@ -158,7 +158,7 @@ const ExpenseForm = () => {
         entry_date: entryDateFormatted,
         payment_type: "conta",
         account_holder: formData.titularConta || null,
-        status: "pending",
+        status: "paid",
         attachment_url: attachmentUrl || null,
         bill_type: "despesa",
       };

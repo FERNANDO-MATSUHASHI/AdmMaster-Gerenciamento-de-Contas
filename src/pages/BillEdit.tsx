@@ -40,6 +40,7 @@ const BillEdit = () => {
     bank_id: "",
     payment_type: "conta",
     status: "pending",
+    bill_type: "conta",
     quantidadeParcelas: "1",
     parcelasDatas: [new Date()],
     parcelasValores: [0]
@@ -125,6 +126,7 @@ const BillEdit = () => {
         bank_id: data.bank_id || "",
         payment_type: data.payment_type || "conta",
         status: data.status || "pending",
+        bill_type: data.bill_type || "conta",
         quantidadeParcelas: "1",
         parcelasDatas: [data.due_date ? parseLocalDate(data.due_date) : new Date()],
         parcelasValores: [parseFloat(data.amount?.toString() || "0")]
@@ -338,16 +340,21 @@ const BillEdit = () => {
         }
       }
 
-      // Para boleto, usar a data da parcela ao invés de due_date
-      const dueDateToSave = formData.payment_type === 'boleto' && formData.parcelasDatas[0]
-        ? format(formData.parcelasDatas[0], 'yyyy-MM-dd')
-        : formData.due_date;
+      // Para despesa, usar entry_date como due_date. Para boleto, usar a data da parcela.
+      const isDespesa = formData.bill_type === 'despesa';
+      const dueDateToSave = isDespesa
+        ? formData.entry_date
+        : (formData.payment_type === 'boleto' && formData.parcelasDatas[0]
+            ? format(formData.parcelasDatas[0], 'yyyy-MM-dd')
+            : formData.due_date);
+
+      const parsedAmount = parseFloat(String(formData.amount).replace(',', '.'));
 
       const { error } = await supabase
         .from('bills')
         .update({
           description: formData.description,
-          amount: parseFloat(formData.amount),
+          amount: isNaN(parsedAmount) ? 0 : parsedAmount,
           due_date: dueDateToSave,
           entry_date: formData.entry_date,
           supplier_id: formData.supplier_id || null,
@@ -387,7 +394,9 @@ const BillEdit = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Button>
-            <h1 className="text-xl font-semibold">Editar Conta</h1>
+            <h1 className="text-xl font-semibold">
+              {formData.bill_type === "despesa" ? "Editar Despesa" : "Editar Conta"}
+            </h1>
           </div>
         </div>
       </header>
@@ -395,7 +404,9 @@ const BillEdit = () => {
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Editar Conta a Pagar</CardTitle>
+            <CardTitle>
+              {formData.bill_type === "despesa" ? "Editar Despesa" : "Editar Conta a Pagar"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -422,7 +433,7 @@ const BillEdit = () => {
                   />
                 </div>
 
-                {formData.payment_type !== "boleto" && (
+                {formData.payment_type !== "boleto" && formData.bill_type !== "despesa" && (
                   <div>
                     <Label>Data de Vencimento *</Label>
                     <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>

@@ -199,93 +199,89 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
               </Button>
             )}
             
-            {bill.status !== 'paid' && (
-              <>
-                {onEditBill && (
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => onEditBill(bill.id)}
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Editar
+            {onEditBill && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onEditBill(bill.id)}
+              >
+                <Edit className="w-4 h-4 mr-1" />
+                Editar
+              </Button>
+            )}
+            
+            {onDeleteBill && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Excluir
                   </Button>
-                )}
-                
-                {onDeleteBill && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline">
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Excluir
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem certeza que deseja excluir a conta "{bill.description}"? Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onDeleteBill(bill.id)}>
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                
-                {onMarkAsPaid && onUploadPaymentProof && (
-                  <Dialog 
-                    open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
-                    onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
-                  >
-                    <DialogTrigger asChild>
-                      <Button size="sm" variant="outline">
-                        <Check className="w-4 h-4 mr-1" />
-                        Marcar como Paga
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Marcar Conta como Paga</DialogTitle>
-                        <DialogDescription>
-                          Deseja anexar um comprovante de pagamento?
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="text-sm text-muted-foreground">
-                          Você pode anexar um comprovante de pagamento (PDF, JPG ou PNG) ou marcar como paga sem comprovante.
-                        </div>
-                      </div>
-                      <DialogFooter className="flex-col sm:flex-row gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            onMarkAsPaid(bill.id);
-                            setPaymentProofDialog({ open: false, billId: null });
-                          }}
-                          disabled={isUpdating}
-                        >
-                          Marcar sem Comprovante
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            onUploadPaymentProof(bill.id);
-                            setPaymentProofDialog({ open: false, billId: null });
-                          }}
-                          disabled={isUpdating}
-                        >
-                          <Paperclip className="w-4 h-4 mr-2" />
-                          Anexar Comprovante
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Tem certeza que deseja excluir "{bill.description}"? Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDeleteBill(bill.id)}>
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            
+            {bill.status !== 'paid' && bill.billType !== 'despesa' && onMarkAsPaid && onUploadPaymentProof && (
+              <Dialog 
+                open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
+                onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Check className="w-4 h-4 mr-1" />
+                    Marcar como Paga
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Marcar Conta como Paga</DialogTitle>
+                    <DialogDescription>
+                      Deseja anexar um comprovante de pagamento?
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="text-sm text-muted-foreground">
+                      Você pode anexar um comprovante de pagamento (PDF, JPG ou PNG) ou marcar como paga sem comprovante.
+                    </div>
+                  </div>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        onMarkAsPaid(bill.id);
+                        setPaymentProofDialog({ open: false, billId: null });
+                      }}
+                      disabled={isUpdating}
+                    >
+                      Marcar sem Comprovante
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        onUploadPaymentProof(bill.id);
+                        setPaymentProofDialog({ open: false, billId: null });
+                      }}
+                      disabled={isUpdating}
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Anexar Comprovante
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>
