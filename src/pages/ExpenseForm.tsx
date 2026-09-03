@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,21 +148,30 @@ const ExpenseForm = () => {
       const entryDateFormatted = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}-${String(entryDate.getDate()).padStart(2, "0")}`;
 
       // Despesa não tem vencimento: due_date = entry_date
-      const { error } = await supabase
-        .from("bills")
-        .insert({
-          user_id: user.id,
-          description: formData.descricao,
-          amount: parseFloat(formData.valor),
-          supplier_id: formData.fornecedor || null,
-          due_date: entryDateFormatted,
-          entry_date: entryDateFormatted,
-          payment_type: "conta",
-          account_holder: formData.titularConta || null,
-          status: "pending",
-          attachment_url: attachmentUrl || null,
-          bill_type: "despesa",
-        });
+      const parsedAmount = parseFloat(formData.valor.replace(",", "."));
+      const insertData: any = {
+        user_id: user.id,
+        description: formData.descricao,
+        amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+        supplier_id: formData.fornecedor || null,
+        due_date: entryDateFormatted,
+        entry_date: entryDateFormatted,
+        payment_type: "conta",
+        account_holder: formData.titularConta || null,
+        status: "pending",
+        attachment_url: attachmentUrl || null,
+        bill_type: "despesa",
+      };
+
+      let { error } = await supabase.from("bills").insert(insertData);
+
+      // Se a coluna bill_type ainda não existe no banco, tenta sem ela
+      if (error && (error.message?.includes("bill_type") || error.code === "PGRST204" || error.code === "42703")) {
+        console.warn("Coluna bill_type não existe ainda. Salvando sem ela. Aplique a migration SQL no Supabase.");
+        const { bill_type, ...insertDataSemTipo } = insertData;
+        const result = await supabase.from("bills").insert(insertDataSemTipo);
+        error = result.error;
+      }
 
       if (error) throw error;
 
@@ -170,10 +179,12 @@ const ExpenseForm = () => {
       navigate("/dashboard");
     } catch (error: any) {
       console.error("Error saving expense:", error);
-      toast({ title: "Erro ao salvar despesa", description: translateErrorMessage(error), variant: "destructive" });
+      const desc = error?.message || error?.details || "Ocorreu um erro inesperado. Tente novamente.";
+      toast({ title: "Erro ao salvar despesa", description: desc, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
+
   };
 
   const handleInputChange = (field: string, value: string | Date) => {
