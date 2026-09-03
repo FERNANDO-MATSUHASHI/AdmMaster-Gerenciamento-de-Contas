@@ -177,13 +177,7 @@ const Reports: React.FC = () => {
         const { data: billsData, error } = await supabase
           .from("bills")
           .select(`
-            id,
-            description,
-            due_date,
-            amount,
-            status,
-            account_holder,
-            bill_type,
+            *,
             suppliers (name)
           `)
           .order("due_date", { ascending: true });

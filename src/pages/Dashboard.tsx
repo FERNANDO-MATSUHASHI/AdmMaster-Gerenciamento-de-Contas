@@ -158,18 +158,7 @@ const Dashboard = () => {
       const { data: allBillsData, error: allBillsError } = await supabase
         .from('bills')
         .select(`
-          id,
-          description,
-          due_date,
-          amount,
-          status,
-          attachment_url,
-          payment_proof_url,
-          payment_type,
-          check_number,
-          account_holder,
-          bill_type,
-          bank_id,
+          *,
           suppliers (name),
           banks (name)
         `)
