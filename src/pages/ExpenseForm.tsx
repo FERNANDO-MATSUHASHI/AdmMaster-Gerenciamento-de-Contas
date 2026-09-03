@@ -156,7 +156,7 @@ const ExpenseForm = () => {
         supplier_id: formData.fornecedor || null,
         due_date: entryDateFormatted,
         entry_date: entryDateFormatted,
-        payment_type: "conta",
+        payment_type: "despesa",
         account_holder: formData.titularConta || null,
         status: "paid",
         attachment_url: attachmentUrl || null,

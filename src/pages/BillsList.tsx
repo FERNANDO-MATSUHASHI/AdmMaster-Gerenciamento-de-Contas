@@ -633,7 +633,7 @@ const BillsList = () => {
                       </>
                     )}
                     
-                    {bill.status !== 'paid' && (
+                    {bill.status !== 'paid' && bill.paymentType !== 'despesa' && (
                       <Dialog 
                         open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
                         onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}

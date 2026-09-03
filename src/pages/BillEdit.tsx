@@ -341,7 +341,7 @@ const BillEdit = () => {
       }
 
       // Para despesa, usar entry_date como due_date. Para boleto, usar a data da parcela.
-      const isDespesa = formData.bill_type === 'despesa';
+      const isDespesa = formData.bill_type === 'despesa' || formData.payment_type === 'despesa';
       const dueDateToSave = isDespesa
         ? formData.entry_date
         : (formData.payment_type === 'boleto' && formData.parcelasDatas[0]
@@ -395,7 +395,7 @@ const BillEdit = () => {
               Voltar
             </Button>
             <h1 className="text-xl font-semibold">
-              {formData.bill_type === "despesa" ? "Editar Despesa" : "Editar Conta"}
+              {(formData.bill_type === "despesa" || formData.payment_type === "despesa") ? "Editar Despesa" : "Editar Conta"}
             </h1>
           </div>
         </div>
@@ -405,7 +405,7 @@ const BillEdit = () => {
         <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle>
-              {formData.bill_type === "despesa" ? "Editar Despesa" : "Editar Conta a Pagar"}
+              {(formData.bill_type === "despesa" || formData.payment_type === "despesa") ? "Editar Despesa" : "Editar Conta a Pagar"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -433,7 +433,7 @@ const BillEdit = () => {
                   />
                 </div>
 
-                {formData.payment_type !== "boleto" && formData.bill_type !== "despesa" && (
+                {formData.payment_type !== "boleto" && formData.bill_type !== "despesa" && formData.payment_type !== "despesa" && (
                   <div>
                     <Label>Data de Vencimento *</Label>
                     <Popover open={isDatePickerOpen.vencimento} onOpenChange={(open) => setIsDatePickerOpen(prev => ({ ...prev, vencimento: open }))}>
@@ -563,6 +563,7 @@ const BillEdit = () => {
                       <SelectItem value="conta">Conta</SelectItem>
                       <SelectItem value="cheque">Cheque</SelectItem>
                       <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="despesa">Despesa</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

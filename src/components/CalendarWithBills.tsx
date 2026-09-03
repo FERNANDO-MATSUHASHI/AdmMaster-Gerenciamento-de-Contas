@@ -125,7 +125,7 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium">{bill.description}</p>
-                {bill.billType === 'despesa' && (
+                {(bill.billType === 'despesa' || bill.paymentType === 'despesa') && (
                   <span className="text-xs px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700 border border-orange-300">
                     Despesa
                   </span>
@@ -235,7 +235,7 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
               </AlertDialog>
             )}
             
-            {bill.status !== 'paid' && bill.billType !== 'despesa' && onMarkAsPaid && onUploadPaymentProof && (
+            {bill.status !== 'paid' && bill.billType !== 'despesa' && bill.paymentType !== 'despesa' && onMarkAsPaid && onUploadPaymentProof && (
               <Dialog 
                 open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
                 onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
@@ -412,15 +412,16 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
                           ? (selectedUser === "Sem Usuário" ? (!bill.accountHolder || !bill.accountHolder.trim()) : bill.accountHolder === selectedUser)
                           : true;
 
+                        const isDespesa = bill.billType === 'despesa' || bill.paymentType === 'despesa';
                         return (
                           <div
                             key={bill.id}
                             className={cn(
                               "text-xs p-1 rounded truncate transition-all",
-                              bill.billType === 'despesa' && "border-l-2 border-orange-400",
+                              isDespesa && "border-l-2 border-orange-400",
                               bill.status === 'paid' && "bg-success/20 text-success",
                               bill.status === 'overdue' && "bg-destructive/20 text-destructive",
-                              bill.status === 'pending' && (bill.billType === 'despesa' ? "bg-orange-50 text-orange-700" : "bg-primary/10 text-primary"),
+                              bill.status === 'pending' && (isDespesa ? "bg-orange-50 text-orange-700" : "bg-primary/10 text-primary"),
                               selectedUser && isUserMatch && "ring-2 ring-primary font-bold shadow-xs bg-primary/25",
                               selectedUser && !isUserMatch && "opacity-30"
                             )}
