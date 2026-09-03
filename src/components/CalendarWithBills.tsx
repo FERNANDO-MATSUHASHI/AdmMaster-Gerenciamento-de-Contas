@@ -166,11 +166,13 @@ export const CalendarWithBills: React.FC<CalendarWithBillsProps> = ({
                   currency: 'BRL'
                 }).format(bill.amount)}
               </p>
-              <Badge className={`${getStatusColor(bill.status)} text-xs`}>
-                {bill.status === 'pending' ? 'Pendente' :
-                 bill.status === 'overdue' ? 'Vencida' :
-                 bill.status === 'paid' ? 'Paga' : 'Desconhecido'}
-              </Badge>
+              {bill.billType !== 'despesa' && bill.paymentType !== 'despesa' && (
+                <Badge className={`${getStatusColor(bill.status)} text-xs`}>
+                  {bill.status === 'pending' ? 'Pendente' :
+                   bill.status === 'overdue' ? 'Vencida' :
+                   bill.status === 'paid' ? 'Paga' : 'Desconhecido'}
+                </Badge>
+              )}
             </div>
           </div>
           

@@ -500,9 +500,11 @@ const BillsList = () => {
                         </Badge>
                       )}
                     </div>
-                    <Badge className={`${getStatusColor(bill.status)} w-fit`}>
-                      {getStatusText(bill.status)}
-                    </Badge>
+                    {bill.billType !== 'despesa' && bill.paymentType !== 'despesa' && (
+                      <Badge className={`${getStatusColor(bill.status)} w-fit`}>
+                        {getStatusText(bill.status)}
+                      </Badge>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-1 gap-3">
