@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, UserPlus, Trash2, Users, UserCheck, Pencil, X, Check } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Users, UserCheck, Pencil, X, Check, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { getExpenseUsers, addExpenseUser, updateExpenseUser, deleteExpenseUser, ExpenseUser } from "@/lib/expenseUsers";
+import { UserReportModal } from "@/components/UserReportModal";
 
 const COLOR_PRESETS = [
   "#3b82f6", // Blue
@@ -27,6 +28,11 @@ const ExpenseUsers = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // User Report Modal state
+  const [selectedUserForReport, setSelectedUserForReport] = useState<string | null>(null);
+  const [selectedUserColor, setSelectedUserColor] = useState<string>("#3b82f6");
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
   const loadUsers = async () => {
     try {
@@ -271,6 +277,20 @@ const ExpenseUsers = () => {
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setSelectedUserForReport(u.name);
+                              setSelectedUserColor(u.color || "#3b82f6");
+                              setIsUserModalOpen(true);
+                            }}
+                            className="text-muted-foreground hover:text-primary"
+                            title="Ver relatório individual"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleSelectUserToEdit(u);
                             }}
                             className="text-muted-foreground hover:text-primary"
@@ -297,6 +317,13 @@ const ExpenseUsers = () => {
           </Card>
         </div>
       </div>
+
+      <UserReportModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        userName={selectedUserForReport}
+        userColor={selectedUserColor}
+      />
     </div>
   );
 };

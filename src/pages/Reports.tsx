@@ -20,8 +20,10 @@ import {
   FileText,
   Filter,
   Printer,
-  Download
+  Download,
+  ExternalLink
 } from "lucide-react";
+import { UserReportModal } from "@/components/UserReportModal";
 
 import {
   ResponsiveContainer,
@@ -74,6 +76,17 @@ const Reports: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedBillType, setSelectedBillType] = useState<string>("all");
+
+  // User Individual Report Modal State
+  const [selectedUserForReport, setSelectedUserForReport] = useState<string | null>(null);
+  const [selectedUserColor, setSelectedUserColor] = useState<string>("#3b82f6");
+  const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
+
+  const handleOpenUserReport = (userName: string, color?: string) => {
+    setSelectedUserForReport(userName);
+    setSelectedUserColor(color || "#3b82f6");
+    setIsUserModalOpen(true);
+  };
 
   const handlePrint = () => {
     window.print();
@@ -653,10 +666,18 @@ const Reports: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm bg-card/70 backdrop-blur-sm">
+            <Card
+              className="border-0 shadow-sm bg-card/70 backdrop-blur-sm hover:bg-card/90 transition-all cursor-pointer group"
+              onClick={() => {
+                if (userChartData.length > 0) {
+                  handleOpenUserReport(userChartData[0].name, userChartData[0].color);
+                }
+              }}
+              title="Clique para abrir o relatório deste usuário"
+            >
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Maior Gastador</p>
+                  <p className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Maior Gastador (Ver Relatório)</p>
                   <p className="text-lg sm:text-xl font-bold truncate">
                     {userChartData.length > 0 ? userChartData[0].name : "Nenhum"}
                   </p>
@@ -664,7 +685,7 @@ const Reports: React.FC = () => {
                     {userChartData.length > 0 ? formatCurrency(userChartData[0].amount) : "R$ 0,00"}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-600">
+                <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-600 group-hover:bg-purple-500/20 transition-colors">
                   <Users className="w-5 h-5" />
                 </div>
               </CardContent>
@@ -709,9 +730,13 @@ const Reports: React.FC = () => {
                         labelFormatter={(label) => `Usuário: ${label}`}
                         contentStyle={{ borderRadius: "8px", backgroundColor: "#ffffff", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
                       />
-                      <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+                      <Bar dataKey="amount" radius={[6, 6, 0, 0]} className="cursor-pointer">
                         {userChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                            onClick={() => handleOpenUserReport(entry.name, entry.color)}
+                          />
                         ))}
                       </Bar>
                     </BarChart>
@@ -854,7 +879,7 @@ const Reports: React.FC = () => {
                 Resumo por Usuário
               </CardTitle>
               <CardDescription>
-                Tabela de valores e quantidade de contas atribuídas a cada usuário no período.
+                Tabela de valores e quantidade de contas atribuídas. <strong>Clique em qualquer usuário</strong> para ver seu relatório individual detalhado.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -866,23 +891,44 @@ const Reports: React.FC = () => {
                       <th className="py-3 px-4">Qtd. Contas</th>
                       <th className="py-3 px-4">Total Gasto</th>
                       <th className="py-3 px-4">% do Total</th>
+                      <th className="py-3 px-4 text-right">Ação</th>
                     </tr>
                   </thead>
                   <tbody>
                     {userChartData.map((u, i) => {
                       const pct = summary.totalAmount > 0 ? ((u.amount / summary.totalAmount) * 100).toFixed(1) : "0";
                       return (
-                        <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
+                        <tr
+                          key={i}
+                          onClick={() => handleOpenUserReport(u.name, u.color)}
+                          className="border-b hover:bg-primary/10 transition-colors cursor-pointer group"
+                        >
                           <td className="py-3 px-4 font-medium flex items-center gap-2">
                             <span
-                              className="w-3 h-3 rounded-full shrink-0"
+                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
                               style={{ backgroundColor: u.color }}
                             />
-                            {u.name}
+                            <span className="group-hover:text-primary font-semibold transition-colors">
+                              {u.name}
+                            </span>
                           </td>
-                          <td className="py-3 px-4">{u.count}</td>
+                          <td className="py-3 px-4 font-medium">{u.count}</td>
                           <td className="py-3 px-4 font-semibold text-primary">{formatCurrency(u.amount)}</td>
                           <td className="py-3 px-4">{pct}%</td>
+                          <td className="py-3 px-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs text-primary hover:bg-primary/20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenUserReport(u.name, u.color);
+                              }}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Ver Relatório</span>
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -892,6 +938,20 @@ const Reports: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* User Individual Report Modal */}
+        <UserReportModal
+          isOpen={isUserModalOpen}
+          onClose={() => setIsUserModalOpen(false)}
+          userName={selectedUserForReport}
+          userColor={selectedUserColor}
+          periodFilter={{
+            periodMode,
+            selectedMonth,
+            selectedYear,
+            monthName: MONTH_NAMES[selectedMonth],
+          }}
+        />
       </div>
     </div>
   );

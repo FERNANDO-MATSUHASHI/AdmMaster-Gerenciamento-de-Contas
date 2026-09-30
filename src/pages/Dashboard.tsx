@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getExpenseUsers } from "@/lib/expenseUsers";
 import { useExpenseUsers } from "@/hooks/useExpenseUsers";
 import { toast } from "@/hooks/use-toast";
+import { UserReportModal } from "@/components/UserReportModal";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
@@ -61,6 +62,17 @@ const Dashboard = () => {
   const [userBreakdown, setUserBreakdown] = useState<Array<{ name: string; total: number; count: number; color?: string }>>([]);
   const [selectedUserFilter, setSelectedUserFilter] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // User Report Modal State
+  const [selectedUserForReport, setSelectedUserForReport] = useState<string | null>(null);
+  const [selectedUserColor, setSelectedUserColor] = useState<string>("#3b82f6");
+  const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
+
+  const handleOpenUserReport = (userName: string, color?: string) => {
+    setSelectedUserForReport(userName);
+    setSelectedUserColor(color || "#3b82f6");
+    setIsUserModalOpen(true);
+  };
   const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
   const [selectedPaymentProof, setSelectedPaymentProof] = useState<{file: File, billId: string} | null>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
@@ -752,12 +764,12 @@ const Dashboard = () => {
                     key={idx} 
                     onClick={() => setSelectedUserFilter(prev => prev === ub.name ? null : ub.name)}
                     className={cn(
-                      "border-0 shadow-sm bg-card/60 backdrop-blur-sm hover:bg-card/90 transition-all cursor-pointer relative overflow-hidden",
+                      "border-0 shadow-sm bg-card/60 backdrop-blur-sm hover:bg-card/90 transition-all cursor-pointer relative overflow-hidden group",
                       isSelected && "ring-2 ring-primary bg-primary/10 shadow-md"
                     )}
                   >
                     <CardContent className="p-3">
-                      <div className="flex items-center justify-between space-x-2 mb-1">
+                      <div className="flex items-center justify-between space-x-1 mb-1">
                         <div className="flex items-center space-x-2 truncate">
                           <div 
                             className="w-3 h-3 rounded-full shrink-0" 
@@ -765,18 +777,34 @@ const Dashboard = () => {
                           />
                           <span className="font-semibold text-xs sm:text-sm truncate">{ub.name}</span>
                         </div>
-                        {isSelected && (
-                          <Badge variant="default" className="text-[9px] px-1 py-0 h-4">
-                            Ver
-                          </Badge>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-primary shrink-0"
+                          title="Ver Relatório Individual"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenUserReport(ub.name, ub.color);
+                          }}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                       <p className="text-base sm:text-lg font-bold text-primary truncate">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(ub.total)}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {ub.count} {ub.count === 1 ? 'conta' : 'contas'}
-                      </p>
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-0.5">
+                        <span>{ub.count} {ub.count === 1 ? 'conta' : 'contas'}</span>
+                        <span 
+                          className="text-primary group-hover:underline font-semibold cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenUserReport(ub.name, ub.color);
+                          }}
+                        >
+                          Relatório &rarr;
+                        </span>
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -986,6 +1014,14 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* User Individual Report Modal */}
+      <UserReportModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        userName={selectedUserForReport}
+        userColor={selectedUserColor}
+      />
     </div>
   );
 };
