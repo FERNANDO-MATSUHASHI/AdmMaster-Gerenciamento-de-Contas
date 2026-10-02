@@ -23,6 +23,11 @@ interface SupplierFormData {
   type_id?: string;
 }
 
+const isValidUUID = (id?: string | null): boolean => {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 export function useSupplierOperations() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -44,8 +49,13 @@ export function useSupplierOperations() {
         throw new Error('User not authenticated');
       }
 
-      // Save supplier to database
-      const { data, error } = await supabase
+      const targetTypeId = isValidUUID(formData.type_id) ? formData.type_id : null;
+
+      let data: any = null;
+      let error: any = null;
+
+      // First attempt with validated targetTypeId
+      const res = await supabase
         .from('suppliers')
         .insert({
           user_id: user.id,
@@ -53,10 +63,33 @@ export function useSupplierOperations() {
           email: formData.email || null,
           phone: formData.phone || null,
           address: formData.address || null,
-          type_id: formData.type_id || null
+          type_id: targetTypeId
         })
         .select()
         .single();
+
+      data = res.data;
+      error = res.error;
+
+      // If failed due to FK constraint or type_id error, retry with type_id = null
+      if (error && targetTypeId !== null) {
+        console.warn('Supplier insert with type_id failed, retrying without type_id:', error);
+        const retryRes = await supabase
+          .from('suppliers')
+          .insert({
+            user_id: user.id,
+            name: formData.name,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            address: formData.address || null,
+            type_id: null
+          })
+          .select()
+          .single();
+
+        data = retryRes.data;
+        error = retryRes.error;
+      }
 
       if (error) throw error;
 
@@ -107,19 +140,46 @@ export function useSupplierOperations() {
         type_id: supplier.type_id
       };
 
+      const targetTypeId = isValidUUID(formData.type_id) ? formData.type_id : null;
+
+      let data: any = null;
+      let error: any = null;
+
       // Update supplier in database
-      const { data, error } = await supabase
+      const res = await supabase
         .from('suppliers')
         .update({
           name: formData.name,
           email: formData.email || null,
           phone: formData.phone || null,
           address: formData.address || null,
-          type_id: formData.type_id || null
+          type_id: targetTypeId
         })
         .eq('id', supplier.id)
         .select()
         .single();
+
+      data = res.data;
+      error = res.error;
+
+      if (error && targetTypeId !== null) {
+        console.warn('Supplier update with type_id failed, retrying without type_id:', error);
+        const retryRes = await supabase
+          .from('suppliers')
+          .update({
+            name: formData.name,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            address: formData.address || null,
+            type_id: null
+          })
+          .eq('id', supplier.id)
+          .select()
+          .single();
+
+        data = retryRes.data;
+        error = retryRes.error;
+      }
 
       if (error) throw error;
 

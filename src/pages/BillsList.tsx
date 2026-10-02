@@ -40,6 +40,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -49,6 +56,12 @@ import { useBillStatusUpdate } from "@/hooks/useBillStatusUpdate";
 import { translateErrorMessage } from "@/lib/errorMessages";
 import { type BillStatus } from "@/lib/billStatusValidation";
 import { useExpenseUsers } from "@/hooks/useExpenseUsers";
+import { RegisterPaymentModal } from "@/components/RegisterPaymentModal";
+
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
 
 const BillsList = () => {
   const navigate = useNavigate();
@@ -59,6 +72,8 @@ const BillsList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [bills, setBills] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>("all");
+  const [selectedYearFilter, setSelectedYearFilter] = useState<string>("all");
   const [paymentProofDialog, setPaymentProofDialog] = useState<{open: boolean, billId: string | null}>({
     open: false,
     billId: null
@@ -66,6 +81,7 @@ const BillsList = () => {
   const [uploadingProof, setUploadingProof] = useState(false);
   const [paymentProofConfirmDialog, setPaymentProofConfirmDialog] = useState(false);
   const [selectedPaymentProof, setSelectedPaymentProof] = useState<{file: File, billId: string} | null>(null);
+  const [registerPaymentBill, setRegisterPaymentBill] = useState<any | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -73,6 +89,14 @@ const BillsList = () => {
     const statusParam = searchParams.get('status');
     if (statusParam) {
       setFilterStatus(statusParam);
+    }
+    const monthParam = searchParams.get('month');
+    if (monthParam !== null && monthParam !== undefined && monthParam !== '') {
+      setSelectedMonthFilter(monthParam);
+    }
+    const yearParam = searchParams.get('year');
+    if (yearParam !== null && yearParam !== undefined && yearParam !== '') {
+      setSelectedYearFilter(yearParam);
     }
   }, [searchParams]);
 
@@ -370,8 +394,16 @@ const BillsList = () => {
       const matchesSearch = bill.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bill.supplier.toLowerCase().includes(searchTerm.toLowerCase());
       
-      if (filterStatus === "all") return matchesSearch;
-      return matchesSearch && bill.status === filterStatus;
+      const matchesStatus = filterStatus === "all" || bill.status === filterStatus;
+
+      const billDate = new Date(bill.dueDate);
+      const billMonth = billDate.getMonth();
+      const billYear = billDate.getFullYear();
+
+      const matchesMonth = selectedMonthFilter === "all" || billMonth === parseInt(selectedMonthFilter);
+      const matchesYear = selectedYearFilter === "all" || billYear === parseInt(selectedYearFilter);
+
+      return matchesSearch && matchesStatus && matchesMonth && matchesYear;
     });
 
   const getStatusColor = (status: string) => {
@@ -380,6 +412,8 @@ const BillsList = () => {
         return 'bg-destructive/10 text-destructive border-destructive/20';
       case 'pending':
         return 'bg-warning/10 text-warning border-warning/20';
+      case 'partially_paid':
+        return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       case 'paid':
         return 'bg-success/10 text-success border-success/20';
       default:
@@ -392,7 +426,9 @@ const BillsList = () => {
       case 'overdue':
         return 'Vencida';
       case 'pending':
-        return 'Pendente';
+        return 'Em Aberto';
+      case 'partially_paid':
+        return 'Parcialmente Paga';
       case 'paid':
         return 'Paga';
       default:
@@ -421,9 +457,13 @@ const BillsList = () => {
                     'Todas as Contas'}
                  </h1>
                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-                   {filterStatus === 'overdue' ? 'Contas que já passaram do vencimento' : 
-                    filterStatus === 'pending' ? 'Contas que vencem nos próximos dias' : 
-                    'Gerencie todas as suas contas a pagar'}
+                   {selectedMonthFilter !== 'all' ? (
+                     `Exibindo contas de ${MONTH_NAMES[parseInt(selectedMonthFilter)]}${selectedYearFilter !== 'all' ? ` / ${selectedYearFilter}` : ''}`
+                   ) : (
+                     filterStatus === 'overdue' ? 'Contas que já passaram do vencimento' : 
+                     filterStatus === 'pending' ? 'Contas que vencem nos próximos dias' : 
+                     'Gerencie todas as suas contas a pagar'
+                   )}
                  </p>
                </div>
             </div>
@@ -449,35 +489,83 @@ const BillsList = () => {
             />
           </div>
           
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              variant={filterStatus === "all" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterStatus("all")}
-            >
-              Todas
-            </Button>
-            <Button 
-              variant={filterStatus === "pending" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterStatus("pending")}
-            >
-              Pendentes
-            </Button>
-            <Button 
-              variant={filterStatus === "overdue" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterStatus("overdue")}
-            >
-              Vencidas
-            </Button>
-            <Button 
-              variant={filterStatus === "paid" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterStatus("paid")}
-            >
-              Pagas
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Button 
+                variant={filterStatus === "all" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setFilterStatus("all")}
+              >
+                Todas
+              </Button>
+              <Button 
+                variant={filterStatus === "pending" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setFilterStatus("pending")}
+              >
+                Pendentes
+              </Button>
+              <Button 
+                variant={filterStatus === "overdue" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setFilterStatus("overdue")}
+              >
+                Vencidas
+              </Button>
+              <Button 
+                variant={filterStatus === "paid" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setFilterStatus("paid")}
+              >
+                Pagas
+              </Button>
+            </div>
+
+            <div className="h-4 w-px bg-border hidden sm:block mx-1" />
+
+            {/* Month & Year Selectors */}
+            <div className="flex items-center gap-2">
+              <Select value={selectedMonthFilter} onValueChange={setSelectedMonthFilter}>
+                <SelectTrigger className="w-[140px] h-9 text-xs bg-card">
+                  <Calendar className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Selecione o Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Meses</SelectItem>
+                  {MONTH_NAMES.map((mName, idx) => (
+                    <SelectItem key={idx} value={idx.toString()}>{mName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedYearFilter} onValueChange={setSelectedYearFilter}>
+                <SelectTrigger className="w-[110px] h-9 text-xs bg-card">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Anos</SelectItem>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2025">2025</SelectItem>
+                  <SelectItem value="2026">2026</SelectItem>
+                  <SelectItem value="2027">2027</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(selectedMonthFilter !== "all" || selectedYearFilter !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSelectedMonthFilter("all");
+                    setSelectedYearFilter("all");
+                  }}
+                >
+                  Limpar Período
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -636,54 +724,15 @@ const BillsList = () => {
                       </>
                     )}
                     
-                    {bill.status !== 'paid' && bill.paymentType !== 'despesa' && (
-                      <Dialog 
-                        open={paymentProofDialog.open && paymentProofDialog.billId === bill.id}
-                        onOpenChange={(open) => setPaymentProofDialog({ open, billId: open ? bill.id : null })}
+                    {bill.status !== 'paid' && (
+                      <Button 
+                        size="sm" 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto gap-1"
+                        onClick={() => setRegisterPaymentBill(bill)}
                       >
-                        <DialogTrigger asChild>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Marcar como Paga
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Marcar Conta como Paga</DialogTitle>
-                            <DialogDescription>
-                              Deseja anexar um comprovante de pagamento?
-                            </DialogDescription>
-                          </DialogHeader>
-                          
-                          <div className="space-y-4 py-4">
-                            <div className="text-sm text-muted-foreground">
-                              Você pode anexar um comprovante de pagamento (PDF, JPG ou PNG) ou marcar como paga sem comprovante.
-                            </div>
-                          </div>
-
-                          <DialogFooter className="flex-col sm:flex-row gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={() => handleMarkAsPaidWithoutProof(bill.id)}
-                              disabled={uploadingProof || isUpdating}
-                            >
-                              Marcar sem Comprovante
-                            </Button>
-                            <Button
-                              onClick={handlePaymentProofUpload}
-                              disabled={uploadingProof || isUpdating}
-                              className="bg-green-500 hover:bg-green-600"
-                            >
-                              <Paperclip className="w-4 h-4 mr-2" />
-                              {uploadingProof ? "Enviando..." : "Anexar Comprovante"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
+                        <DollarSign className="w-4 h-4" />
+                        Registrar Pagamento
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -761,6 +810,14 @@ const BillsList = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal para Registrar Pagamento Total ou Parcial */}
+      <RegisterPaymentModal
+        isOpen={!!registerPaymentBill}
+        onClose={() => setRegisterPaymentBill(null)}
+        bill={registerPaymentBill}
+        onSuccess={() => fetchBills()}
+      />
     </div>
   );
 };

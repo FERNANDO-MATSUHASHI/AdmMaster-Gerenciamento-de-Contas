@@ -26,6 +26,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import { getLocalSupplierTypes } from "./SupplierTypes";
+
 const SupplierForm = () => {
   const navigate = useNavigate();
   const { createSupplier, updateSupplier, deleteSupplier, isLoading } = useSupplierOperations();
@@ -58,32 +60,72 @@ const SupplierForm = () => {
 
   const fetchSupplierTypes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('supplier_types')
-        .select('*')
-        .order('name');
+      let remote: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('supplier_types')
+          .select('*')
+          .order('name');
 
-      if (error) throw error;
-      setSupplierTypes(data || []);
+        if (!error && data) remote = data;
+      } catch (e) {
+        console.warn('Remote supplier types fetch failed:', e);
+      }
+
+      const locals = getLocalSupplierTypes();
+      const existingIds = new Set(remote.map(t => t.id));
+      const combined = [...remote, ...locals.filter(t => !existingIds.has(t.id))];
+
+      setSupplierTypes(combined);
     } catch (error) {
       console.error('Erro ao buscar tipos de fornecedor:', error);
+      setSupplierTypes(getLocalSupplierTypes());
     }
   };
 
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select(`
-          *,
-          supplier_types (
-            name
-          )
-        `)
-        .order('created_at', { ascending: false });
+      let data: any[] = [];
+      try {
+        const { data: remoteData, error } = await supabase
+          .from('suppliers')
+          .select(`
+            *,
+            supplier_types (
+              name
+            )
+          `)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setSuppliers(data || []);
+        if (!error && remoteData) {
+          data = remoteData;
+        } else {
+          // Retry simple query if relation fails
+          const { data: simpleData } = await supabase
+            .from('suppliers')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (simpleData) data = simpleData;
+        }
+      } catch (e) {
+        console.warn('Remote suppliers fetch failed:', e);
+      }
+
+      // Map local supplier_types if relation missing
+      const localTypes = getLocalSupplierTypes();
+      const typeMap = new Map(localTypes.map(t => [t.id, t.name]));
+
+      const enriched = data.map(s => {
+        if (!s.supplier_types && s.type_id && typeMap.has(s.type_id)) {
+          return {
+            ...s,
+            supplier_types: { name: typeMap.get(s.type_id) }
+          };
+        }
+        return s;
+      });
+
+      setSuppliers(enriched);
     } catch (error) {
       console.error('Erro ao buscar fornecedores:', error);
     }
@@ -457,7 +499,9 @@ const SupplierForm = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="cnpj">CNPJ</Label>
+                      <div className="flex items-center justify-between h-5 mb-1.5">
+                        <Label htmlFor="cnpj">CNPJ</Label>
+                      </div>
                       <Input
                         id="cnpj"
                         placeholder="00.000.000/0000-00"
@@ -468,7 +512,18 @@ const SupplierForm = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="type_id">Tipo de Fornecedor</Label>
+                      <div className="flex items-center justify-between h-5 mb-1.5">
+                        <Label htmlFor="type_id">Tipo de Fornecedor</Label>
+                        <Button 
+                          type="button" 
+                          variant="link" 
+                          size="sm" 
+                          className="h-auto p-0 text-xs text-primary font-medium"
+                          onClick={() => navigate("/tipos-fornecedor")}
+                        >
+                          + Gerenciar Tipos
+                        </Button>
+                      </div>
                       <Select value={formData.type_id} onValueChange={(value) => handleInputChange("type_id", value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o tipo" />

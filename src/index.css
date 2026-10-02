@@ -122,3 +122,155 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Print System Styles */
+@media print {
+  /* Override dark mode & HSL variables during print to pure light theme */
+  :root, html, body, .dark, [class*="dark"] {
+    --background: 0 0% 100% !important;
+    --foreground: 210 11% 15% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 210 11% 15% !important;
+    --popover: 0 0% 100% !important;
+    --popover-foreground: 210 11% 15% !important;
+    --primary: 210 100% 56% !important;
+    --primary-foreground: 0 0% 100% !important;
+    --secondary: 210 20% 96% !important;
+    --secondary-foreground: 210 11% 15% !important;
+    --muted: 210 20% 96% !important;
+    --muted-foreground: 210 6% 46% !important;
+    --border: 210 20% 90% !important;
+    --input: 210 20% 90% !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  /* Base page container setup */
+  html, body {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Force readable text colors */
+  p, span, h1, h2, h3, h4, h5, h6, td, th, label, li, a {
+    color: #0f172a !important;
+    text-shadow: none !important;
+  }
+
+  .text-muted-foreground, .text-gray-500, .text-slate-500 {
+    color: #475569 !important;
+  }
+
+  .text-primary {
+    color: #2563eb !important;
+  }
+
+  /* Neutralize background gradients on page wrappers */
+  .bg-gradient-to-br, .bg-gradient-to-r, .bg-gradient-to-l, .bg-gradient-to-t, .bg-gradient-to-b,
+  [class*="bg-gradient-"] {
+    background-image: none !important;
+    background-color: #ffffff !important;
+  }
+
+  /* Hide navigation, buttons, and non-printable elements */
+  nav, header, button, .print\:hidden, .modal-no-print {
+    display: none !important;
+  }
+
+  /* Modal / Dialog Print Overrides */
+  /* If a dialog is open when printing, hide the background app container (#root) */
+  body:has([role="dialog"]) #root {
+    display: none !important;
+  }
+
+  /* Hide Radix backdrop overlays so they don't cover the printed content with solid white */
+  [data-radix-portal] > div:not([role="dialog"]),
+  [data-state="open"].fixed.inset-0:not([role="dialog"]) {
+    display: none !important;
+  }
+
+  /* Format Radix Dialog content as normal static flow on white page */
+  div[role="dialog"] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    max-height: none !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  /* Expand all scroll containers so print doesn't truncate overflowing content */
+  #user-report-printable-area,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Cards in print */
+  .card, [class*="bg-card"], [class*="bg-muted"], [class*="bg-secondary"] {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Repeat table headers on multi-page prints */
+  thead {
+    display: table-header-group !important;
+    background-color: #f8fafc !important;
+  }
+
+  th, td {
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  /* Prevent row and card splitting across pages */
+  tr, .card, table {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Printable page container rules */
+  .pdf-page-container {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    color: #0f172a !important;
+  }
+
+  .pdf-page-container:last-of-type {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+}
+

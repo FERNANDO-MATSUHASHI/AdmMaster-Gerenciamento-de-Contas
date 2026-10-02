@@ -1,0 +1,30 @@
+// vite.config.ts
+import { defineConfig } from "file:///D:/App%20-%20Gerenciamento%20Contas/AdmMaster-Gerenciamento-de-Contas/node_modules/vite/dist/node/index.js";
+import react from "file:///D:/App%20-%20Gerenciamento%20Contas/AdmMaster-Gerenciamento-de-Contas/node_modules/@vitejs/plugin-react-swc/index.js";
+import path from "path";
+import { componentTagger } from "file:///D:/App%20-%20Gerenciamento%20Contas/AdmMaster-Gerenciamento-de-Contas/node_modules/lovable-tagger/dist/index.js";
+var __vite_injected_original_dirname = "D:\\App - Gerenciamento Contas\\AdmMaster-Gerenciamento-de-Contas";
+var vite_config_default = defineConfig(({ mode }) => ({
+  server: {
+    host: true,
+    port: 80,
+    strictPort: false
+  },
+  preview: {
+    allowedHosts: [
+      "admmaster-gerenciamento-de-contas.e6fnyq.easypanel.host",
+      "www.admmaster.com.br",
+      "admmaster.com.br"
+    ]
+  },
+  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  resolve: {
+    alias: {
+      "@": path.resolve(__vite_injected_original_dirname, "./src")
+    }
+  }
+}));
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCJEOlxcXFxBcHAgLSBHZXJlbmNpYW1lbnRvIENvbnRhc1xcXFxBZG1NYXN0ZXItR2VyZW5jaWFtZW50by1kZS1Db250YXNcIjtjb25zdCBfX3ZpdGVfaW5qZWN0ZWRfb3JpZ2luYWxfZmlsZW5hbWUgPSBcIkQ6XFxcXEFwcCAtIEdlcmVuY2lhbWVudG8gQ29udGFzXFxcXEFkbU1hc3Rlci1HZXJlbmNpYW1lbnRvLWRlLUNvbnRhc1xcXFx2aXRlLmNvbmZpZy50c1wiO2NvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9pbXBvcnRfbWV0YV91cmwgPSBcImZpbGU6Ly8vRDovQXBwJTIwLSUyMEdlcmVuY2lhbWVudG8lMjBDb250YXMvQWRtTWFzdGVyLUdlcmVuY2lhbWVudG8tZGUtQ29udGFzL3ZpdGUuY29uZmlnLnRzXCI7aW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSBcInZpdGVcIjtcclxuaW1wb3J0IHJlYWN0IGZyb20gXCJAdml0ZWpzL3BsdWdpbi1yZWFjdC1zd2NcIjtcclxuaW1wb3J0IHBhdGggZnJvbSBcInBhdGhcIjtcclxuaW1wb3J0IHsgY29tcG9uZW50VGFnZ2VyIH0gZnJvbSBcImxvdmFibGUtdGFnZ2VyXCI7XHJcblxyXG4vLyBodHRwczovL3ZpdGVqcy5kZXYvY29uZmlnL1xyXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoKHsgbW9kZSB9KSA9PiAoe1xyXG4gIHNlcnZlcjoge1xyXG4gICAgaG9zdDogdHJ1ZSxcclxuICAgIHBvcnQ6IDgwLFxyXG4gICAgc3RyaWN0UG9ydDogZmFsc2UsXHJcbiAgfSxcclxuICAgIHByZXZpZXc6IHtcclxuICAgIGFsbG93ZWRIb3N0czogW1xyXG4gICAgICBcImFkbW1hc3Rlci1nZXJlbmNpYW1lbnRvLWRlLWNvbnRhcy5lNmZueXEuZWFzeXBhbmVsLmhvc3RcIixcclxuICAgICAgXCJ3d3cuYWRtbWFzdGVyLmNvbS5iclwiLFxyXG4gICAgICBcImFkbW1hc3Rlci5jb20uYnJcIlxyXG4gICAgXSxcclxuICB9LFxyXG4gIHBsdWdpbnM6IFtyZWFjdCgpLCBtb2RlID09PSBcImRldmVsb3BtZW50XCIgJiYgY29tcG9uZW50VGFnZ2VyKCldLmZpbHRlcihCb29sZWFuKSxcclxuICByZXNvbHZlOiB7XHJcbiAgICBhbGlhczoge1xyXG4gICAgICBcIkBcIjogcGF0aC5yZXNvbHZlKF9fZGlybmFtZSwgXCIuL3NyY1wiKSxcclxuICAgIH0sXHJcbiAgfSxcclxufSkpO1xyXG4iXSwKICAibWFwcGluZ3MiOiAiO0FBQTJYLFNBQVMsb0JBQW9CO0FBQ3haLE9BQU8sV0FBVztBQUNsQixPQUFPLFVBQVU7QUFDakIsU0FBUyx1QkFBdUI7QUFIaEMsSUFBTSxtQ0FBbUM7QUFNekMsSUFBTyxzQkFBUSxhQUFhLENBQUMsRUFBRSxLQUFLLE9BQU87QUFBQSxFQUN6QyxRQUFRO0FBQUEsSUFDTixNQUFNO0FBQUEsSUFDTixNQUFNO0FBQUEsSUFDTixZQUFZO0FBQUEsRUFDZDtBQUFBLEVBQ0UsU0FBUztBQUFBLElBQ1QsY0FBYztBQUFBLE1BQ1o7QUFBQSxNQUNBO0FBQUEsTUFDQTtBQUFBLElBQ0Y7QUFBQSxFQUNGO0FBQUEsRUFDQSxTQUFTLENBQUMsTUFBTSxHQUFHLFNBQVMsaUJBQWlCLGdCQUFnQixDQUFDLEVBQUUsT0FBTyxPQUFPO0FBQUEsRUFDOUUsU0FBUztBQUFBLElBQ1AsT0FBTztBQUFBLE1BQ0wsS0FBSyxLQUFLLFFBQVEsa0NBQVcsT0FBTztBQUFBLElBQ3RDO0FBQUEsRUFDRjtBQUNGLEVBQUU7IiwKICAibmFtZXMiOiBbXQp9Cg==

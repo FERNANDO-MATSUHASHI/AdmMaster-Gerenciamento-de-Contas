@@ -1,5 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export type AuditLogTable = 
+  | 'bills' 
+  | 'suppliers' 
+  | 'banks' 
+  | 'supplier_types' 
+  | 'companies' 
+  | 'financial_entries' 
+  | 'bill_payments' 
+  | 'cash_settings' 
+  | (string & {});
+
 interface AuditLogEntry {
   user_id: string;
   table_name: string;
@@ -14,9 +25,9 @@ export function useAuditLog() {
    * Creates an audit log entry for database operations
    */
   const createAuditLog = async (
-    tableName: 'bills' | 'suppliers' | 'banks' | 'supplier_types',
+    tableName: AuditLogTable,
     recordId: string,
-    action: 'status_update' | 'create' | 'update' | 'delete',
+    action: 'status_update' | 'create' | 'update' | 'delete' | (string & {}),
     oldValues: Record<string, any> = {},
     newValues: Record<string, any> = {}
   ): Promise<void> => {

@@ -286,6 +286,181 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string
+          complemento: string | null
+          created_at: string
+          estado: string | null
+          id: string
+          logradouro: string | null
+          numero: string | null
+          razao_social: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj: string
+          complemento?: string | null
+          created_at?: string
+          estado?: string | null
+          id?: string
+          logradouro?: string | null
+          numero?: string | null
+          razao_social: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string
+          complemento?: string | null
+          created_at?: string
+          estado?: string | null
+          id?: string
+          logradouro?: string | null
+          numero?: string | null
+          razao_social?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      financial_entries: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          description: string
+          expected_date: string
+          id: string
+          observation: string | null
+          payment_method: string
+          received_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          description: string
+          expected_date: string
+          id?: string
+          observation?: string | null
+          payment_method: string
+          received_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          description?: string
+          expected_date?: string
+          id?: string
+          observation?: string | null
+          payment_method?: string
+          received_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bill_payments: {
+        Row: {
+          amount_paid: number
+          bill_id: string
+          created_at: string
+          id: string
+          observation: string | null
+          payment_date: string
+          payment_method: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_paid: number
+          bill_id: string
+          created_at?: string
+          id?: string
+          observation?: string | null
+          payment_date: string
+          payment_method: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          bill_id?: string
+          created_at?: string
+          id?: string
+          observation?: string | null
+          payment_date?: string
+          payment_method?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cash_settings: {
+        Row: {
+          created_at: string
+          id: string
+          initial_balance: number
+          reference_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          reference_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          initial_balance?: number
+          reference_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

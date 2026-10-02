@@ -101,7 +101,7 @@ const Reports: React.FC = () => {
     try {
       toast({
         title: "Gerando PDF...",
-        description: "Aguarde enquanto o PDF é preparado.",
+        description: "Aguarde enquanto o relatório completo é preparado.",
       });
 
       const html2canvas = (await import("html2canvas")).default;
@@ -131,35 +131,94 @@ const Reports: React.FC = () => {
       // A4 dimensions in mm
       const pdfW = 210;
       const pdfH = 297;
-      const margin = 10;
-      const usableW = pdfW - margin * 2;
-      const usableH = pdfH - margin * 2;
+      const marginTop = 15;
+      const marginBottom = 15;
+      const marginX = 12;
+
+      const usableW = pdfW - marginX * 2; // 186mm
+      const usableH = pdfH - marginTop - marginBottom; // 267mm
 
       const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = usableW;
 
-      const addPageToPdf = (canvas: HTMLCanvasElement, isFirst: boolean) => {
-        if (!isFirst) pdf.addPage();
+      // Calculate slices for canvas1 and canvas2
+      const h1 = (canvas1.height * usableW) / canvas1.width;
+      const pagesCount1 = Math.max(1, Math.ceil(h1 / usableH));
+
+      const h2 = (canvas2.height * usableW) / canvas2.width;
+      const pagesCount2 = Math.max(1, Math.ceil(h2 / usableH));
+
+      const totalPages = pagesCount1 + pagesCount2;
+      const issueDateStr = new Date().toLocaleDateString("pt-BR");
+      const issueTimeStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+      let currentPdfPage = 0;
+
+      const renderCanvasPages = (canvas: HTMLCanvasElement, pageCount: number) => {
+        const imgHeight = (canvas.height * usableW) / canvas.width;
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
-        const aspect = canvas.height / canvas.width;
-        let w = usableW;
-        let h = w * aspect;
-        // Scale down if taller than usable height
-        if (h > usableH) {
-          h = usableH;
-          w = h / aspect;
+
+        for (let i = 1; i <= pageCount; i++) {
+          currentPdfPage++;
+          if (currentPdfPage > 1) {
+            pdf.addPage();
+          }
+
+          const positionY = marginTop - (i - 1) * usableH;
+          pdf.addImage(imgData, "JPEG", marginX, positionY, imgWidth, imgHeight);
+
+          // Solid white rectangle mask for top margin
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, 0, pdfW, marginTop, "F");
+
+          // Solid white rectangle mask for bottom margin
+          pdf.rect(0, pdfH - marginBottom, pdfW, marginBottom, "F");
+
+          // Running header on pages 2+
+          if (currentPdfPage > 1) {
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(
+              `Relatório de Contas e Despesas • ${periodMode === "month" ? MONTH_NAMES[selectedMonth] + "/" + selectedYear : selectedYear}`,
+              marginX,
+              marginTop - 5
+            );
+            pdf.text(`AdmMaster`, pdfW - marginX, marginTop - 5, { align: "right" });
+
+            pdf.setDrawColor(226, 232, 240);
+            pdf.setLineWidth(0.3);
+            pdf.line(marginX, marginTop - 3, pdfW - marginX, marginTop - 3);
+          }
+
+          // Running footer on all pages
+          pdf.setDrawColor(226, 232, 240);
+          pdf.setLineWidth(0.3);
+          pdf.line(marginX, pdfH - marginBottom + 3, pdfW - marginX, pdfH - marginBottom + 3);
+
+          pdf.setFontSize(8);
+          pdf.setTextColor(148, 163, 184);
+          pdf.text(
+            `AdmMaster Gerenciamento de Contas • Emissão: ${issueDateStr} ${issueTimeStr}`,
+            marginX,
+            pdfH - marginBottom + 8
+          );
+          pdf.text(
+            `Página ${currentPdfPage} de ${totalPages}`,
+            pdfW - marginX,
+            pdfH - marginBottom + 8,
+            { align: "right" }
+          );
         }
-        const x = margin + (usableW - w) / 2;
-        pdf.addImage(imgData, "JPEG", x, margin, w, h);
       };
 
-      addPageToPdf(canvas1, true);
-      addPageToPdf(canvas2, false);
+      renderCanvasPages(canvas1, pagesCount1);
+      renderCanvasPages(canvas2, pagesCount2);
 
       pdf.save(`Relatorio_Contas_${periodText}.pdf`);
 
       toast({
-        title: "PDF Gerado!",
-        description: `Relatorio_Contas_${periodText}.pdf salvo com sucesso.`,
+        title: "PDF Gerado com Sucesso!",
+        description: `Relatorio_Contas_${periodText}.pdf salvo (${totalPages} páginas).`,
       });
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
@@ -355,20 +414,48 @@ const Reports: React.FC = () => {
           margin: 12mm 10mm;
         }
         @media print {
+          :root, html, body, .dark, [class*="dark"] {
+            --background: 0 0% 100% !important;
+            --foreground: 210 11% 15% !important;
+            --card: 0 0% 100% !important;
+            --card-foreground: 210 11% 15% !important;
+            --popover: 0 0% 100% !important;
+            --popover-foreground: 210 11% 15% !important;
+            --primary: 210 100% 56% !important;
+            --primary-foreground: 0 0% 100% !important;
+            --secondary: 210 20% 96% !important;
+            --secondary-foreground: 210 11% 15% !important;
+            --muted: 210 20% 96% !important;
+            --muted-foreground: 210 6% 46% !important;
+            --border: 210 20% 90% !important;
+          }
           html, body {
             background-color: #ffffff !important;
+            background-image: none !important;
             color: #0f172a !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            margin: 0 !important;
-            padding: 0 !important;
             width: 100% !important;
+          }
+          p, span, h1, h2, h3, h4, h5, h6, td, th, label, li, a {
+            color: #0f172a !important;
+            text-shadow: none !important;
+          }
+          .text-muted-foreground, .text-gray-500, .text-slate-500 {
+            color: #475569 !important;
+          }
+          .bg-gradient-to-br, .bg-gradient-to-r, .bg-gradient-to-l, .bg-gradient-to-t, .bg-gradient-to-b,
+          [class*="bg-gradient-"] {
+            background-image: none !important;
+            background-color: #ffffff !important;
           }
           .print\\:hidden {
             display: none !important;
           }
           /* Each report page occupies exactly one printed page */
           .pdf-page-container {
+            background-color: #ffffff !important;
+            background-image: none !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: always !important;

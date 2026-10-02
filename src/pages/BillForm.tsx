@@ -638,7 +638,9 @@ const BillForm = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="fornecedor">Fornecedor *</Label>
+                      <div className="flex items-center justify-between h-5 mb-1.5">
+                        <Label htmlFor="fornecedor">Fornecedor *</Label>
+                      </div>
                       <Select value={formData.fornecedor} onValueChange={(value) => handleInputChange("fornecedor", value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o fornecedor" />
@@ -654,7 +656,7 @@ const BillForm = () => {
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between h-5 mb-1.5">
                         <Label htmlFor="titularConta">Pessoa / Usuário</Label>
                         <Button 
                           type="button" 

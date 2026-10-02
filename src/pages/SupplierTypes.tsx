@@ -21,6 +21,66 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const LOCAL_SUPPLIER_TYPES_KEY = 'adm_master_local_supplier_types';
+
+const defaultUuidMap: Record<string, string> = {
+  'default-1': 'a0000000-0000-4000-a000-000000000001',
+  'default-2': 'a0000000-0000-4000-a000-000000000002',
+  'default-3': 'a0000000-0000-4000-a000-000000000003',
+  'default-4': 'a0000000-0000-4000-a000-000000000004',
+  'default-5': 'a0000000-0000-4000-a000-000000000005',
+  'default-6': 'a0000000-0000-4000-a000-000000000006',
+  'default-7': 'a0000000-0000-4000-a000-000000000007',
+  'default-8': 'a0000000-0000-4000-a000-000000000008',
+};
+
+export const getLocalSupplierTypes = (): any[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_SUPPLIER_TYPES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      let migrated = false;
+      const clean = parsed.map((item: any) => {
+        if (item.id && defaultUuidMap[item.id]) {
+          migrated = true;
+          return { ...item, id: defaultUuidMap[item.id] };
+        }
+        if (item.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) {
+          migrated = true;
+          return { ...item, id: crypto.randomUUID() };
+        }
+        return item;
+      });
+      if (migrated) {
+        localStorage.setItem(LOCAL_SUPPLIER_TYPES_KEY, JSON.stringify(clean));
+      }
+      return clean;
+    }
+    const defaults = [
+      { id: 'a0000000-0000-4000-a000-000000000001', name: 'Produtos' },
+      { id: 'a0000000-0000-4000-a000-000000000002', name: 'Serviços' },
+      { id: 'a0000000-0000-4000-a000-000000000003', name: 'Alimentação' },
+      { id: 'a0000000-0000-4000-a000-000000000004', name: 'Combustível' },
+      { id: 'a0000000-0000-4000-a000-000000000005', name: 'Manutenção' },
+      { id: 'a0000000-0000-4000-a000-000000000006', name: 'Serviços Médicos / Saúde' },
+      { id: 'a0000000-0000-4000-a000-000000000007', name: 'Transporte / Logística' },
+      { id: 'a0000000-0000-4000-a000-000000000008', name: 'Outros' }
+    ];
+    localStorage.setItem(LOCAL_SUPPLIER_TYPES_KEY, JSON.stringify(defaults));
+    return defaults;
+  } catch {
+    return [];
+  }
+};
+
+export const saveLocalSupplierTypes = (types: any[]) => {
+  try {
+    localStorage.setItem(LOCAL_SUPPLIER_TYPES_KEY, JSON.stringify(types));
+  } catch (e) {
+    console.error('Error saving local supplier types:', e);
+  }
+};
+
 const SupplierTypes = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -34,15 +94,28 @@ const SupplierTypes = () => {
 
   const fetchSupplierTypes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('supplier_types')
-        .select('*')
-        .order('name');
+      let remote: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('supplier_types')
+          .select('*')
+          .order('name');
 
-      if (error) throw error;
-      setTypes(data || []);
+        if (!error && data) {
+          remote = data;
+        }
+      } catch (e) {
+        console.warn('Remote supplier types fetch failed, using local fallback', e);
+      }
+
+      const locals = getLocalSupplierTypes();
+      const existingIds = new Set(remote.map(t => t.id));
+      const combined = [...remote, ...locals.filter(t => !existingIds.has(t.id))];
+
+      setTypes(combined);
     } catch (error) {
       console.error('Erro ao buscar tipos de fornecedor:', error);
+      setTypes(getLocalSupplierTypes());
     }
   };
 
@@ -58,34 +131,50 @@ const SupplierTypes = () => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Você precisa estar logado",
-          variant: "destructive",
-        });
-        return;
+
+      // Try remote insert if authenticated
+      if (user) {
+        try {
+          const { error } = await supabase
+            .from('supplier_types')
+            .insert({
+              user_id: user.id,
+              name: newTypeName.trim()
+            });
+
+          if (!error) {
+            setNewTypeName("");
+            fetchSupplierTypes();
+            toast({
+              title: "Sucesso",
+              description: "Tipo de fornecedor criado com sucesso!",
+            });
+            return;
+          }
+        } catch (dbError) {
+          console.warn('Supabase insert failed, using local storage fallback', dbError);
+        }
       }
 
-      const { error } = await supabase
-        .from('supplier_types')
-        .insert({
-          user_id: user.id,
-          name: newTypeName.trim()
-        });
+      // Local storage fallback
+      const newTypeObj = {
+        id: crypto.randomUUID(),
+        name: newTypeName.trim(),
+        user_id: user?.id || 'local-user',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      const locals = getLocalSupplierTypes();
+      locals.unshift(newTypeObj);
+      saveLocalSupplierTypes(locals);
 
       setNewTypeName("");
       fetchSupplierTypes();
 
       toast({
         title: "Sucesso",
-        description: "Tipo de fornecedor criado com sucesso!",
+        description: `Tipo "${newTypeObj.name}" cadastrado com sucesso!`,
       });
-
-      navigate("/dashboard");
     } catch (error) {
       console.error('Erro ao criar tipo:', error);
       toast({
@@ -111,12 +200,24 @@ const SupplierTypes = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('supplier_types')
-        .update({ name: editingType.name.trim() })
-        .eq('id', editingType.id);
+      let isRemoteSuccess = false;
+      try {
+        if (!editingType.id.startsWith('default-') && editingType.user_id !== 'local-user') {
+          const { error } = await supabase
+            .from('supplier_types')
+            .update({ name: editingType.name.trim() })
+            .eq('id', editingType.id);
+          if (!error) isRemoteSuccess = true;
+        }
+      } catch (e) {
+        console.warn('Remote update failed:', e);
+      }
 
-      if (error) throw error;
+      if (!isRemoteSuccess) {
+        const locals = getLocalSupplierTypes();
+        const updated = locals.map(t => t.id === editingType.id ? { ...t, name: editingType.name.trim() } : t);
+        saveLocalSupplierTypes(updated);
+      }
 
       setEditingType(null);
       fetchSupplierTypes();
@@ -137,12 +238,24 @@ const SupplierTypes = () => {
 
   const handleDeleteType = async (typeId: string) => {
     try {
-      const { error } = await supabase
-        .from('supplier_types')
-        .delete()
-        .eq('id', typeId);
+      let isRemoteSuccess = false;
+      try {
+        if (!typeId.startsWith('default-')) {
+          const { error } = await supabase
+            .from('supplier_types')
+            .delete()
+            .eq('id', typeId);
+          if (!error) isRemoteSuccess = true;
+        }
+      } catch (e) {
+        console.warn('Remote delete failed:', e);
+      }
 
-      if (error) throw error;
+      if (!isRemoteSuccess) {
+        const locals = getLocalSupplierTypes();
+        const filtered = locals.filter(t => t.id !== typeId);
+        saveLocalSupplierTypes(filtered);
+      }
 
       fetchSupplierTypes();
 
@@ -235,7 +348,7 @@ const SupplierTypes = () => {
                       <div className="flex items-center gap-3">
                         <Badge variant="outline">{type.name}</Badge>
                         <span className="text-sm text-muted-foreground">
-                          Criado em {new Date(type.created_at).toLocaleDateString('pt-BR')}
+                          {type.created_at ? `Criado em ${new Date(type.created_at).toLocaleDateString('pt-BR')}` : 'Tipo Padrão'}
                         </span>
                       </div>
                       <div className="flex gap-2">

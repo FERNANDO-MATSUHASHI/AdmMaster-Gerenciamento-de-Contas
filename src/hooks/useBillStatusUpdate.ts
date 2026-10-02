@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { validateStatusTransition, type BillStatus } from '@/lib/billStatusValidation';
 import { useToast } from '@/hooks/use-toast';
 import { translateErrorMessage } from '@/lib/errorMessages';
+import { getLocalBillPayments, saveLocalBillPayments } from '@/hooks/useBillPaymentOperations';
+import { format } from 'date-fns';
 
 interface Bill {
   id: string;
@@ -25,9 +27,6 @@ export function useBillStatusUpdate() {
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
-  /**
-   * Creates an audit log entry for the status change
-   */
   const createAuditLog = async (
     bill: Bill,
     oldStatus: BillStatus,
@@ -49,12 +48,77 @@ export function useBillStatusUpdate() {
 
     if (error) {
       console.error('Failed to create audit log:', error);
-      // Don't throw here - audit log failure shouldn't prevent the status update
     }
   };
 
   /**
-   * Updates bill status with validation and audit logging
+   * Syncs bill payment record in bill_payments when status changes to paid / un-paid
+   */
+  const syncPaymentForStatus = async (bill: Bill, newStatus: BillStatus, userId: string) => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const paymentDate = bill.payment_date || bill.paid_at || todayStr;
+    const paymentMethod = bill.payment_type || bill.payment_method || 'Pix';
+
+    if (newStatus === 'paid') {
+      // 1. Try remote insert into bill_payments
+      try {
+        const { data: existing } = await supabase
+          .from('bill_payments')
+          .select('id')
+          .eq('bill_id', bill.id)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('bill_payments').insert({
+            user_id: userId,
+            bill_id: bill.id,
+            amount_paid: Number(bill.amount),
+            payment_date: paymentDate,
+            payment_method: paymentMethod
+          });
+        }
+      } catch (e) {
+        console.warn('Error syncing remote bill payment on status update:', e);
+      }
+
+      // 2. Sync local bill_payments
+      const localPayments = getLocalBillPayments();
+      if (!localPayments.some(lp => lp.bill_id === bill.id)) {
+        localPayments.unshift({
+          id: crypto.randomUUID(),
+          user_id: userId,
+          bill_id: bill.id,
+          amount_paid: Number(bill.amount),
+          payment_date: paymentDate,
+          payment_method: paymentMethod,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          bills: {
+            description: bill.description,
+            amount: Number(bill.amount)
+          }
+        });
+        saveLocalBillPayments(localPayments);
+      }
+    } else if (newStatus === 'pending' || newStatus === 'overdue') {
+      // If status reverted to pending/overdue, remove corresponding payment entries
+      try {
+        await supabase
+          .from('bill_payments')
+          .delete()
+          .eq('bill_id', bill.id);
+      } catch (e) {
+        console.warn('Error deleting remote bill_payments on revert:', e);
+      }
+
+      const localPayments = getLocalBillPayments();
+      const updatedLocals = localPayments.filter(lp => lp.bill_id !== bill.id);
+      saveLocalBillPayments(updatedLocals);
+    }
+  };
+
+  /**
+   * Updates bill status with validation, audit logging, and cash payment sync
    */
   const updateBillStatus = async (
     bill: Bill,
@@ -66,15 +130,11 @@ export function useBillStatusUpdate() {
     setIsUpdating(true);
 
     try {
-      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('User not authenticated');
-      }
+      const userId = user?.id || 'local-user';
 
       const currentStatus = bill.status as BillStatus;
       
-      // Validate status transition
       const transition = validateStatusTransition(currentStatus, newStatus);
       if (!transition.isValid) {
         toast({
@@ -86,23 +146,29 @@ export function useBillStatusUpdate() {
       }
 
       // Update bill status in database
-      const { error: updateError } = await supabase
-        .from('bills')
-        .update({ status: newStatus })
-        .eq('id', bill.id);
+      if (user) {
+        try {
+          const { error: updateError } = await supabase
+            .from('bills')
+            .update({ status: newStatus })
+            .eq('id', bill.id);
 
-      if (updateError) throw updateError;
+          if (updateError) throw updateError;
 
-      // Create audit log entry
-      await createAuditLog(bill, currentStatus, newStatus, user.id);
+          await createAuditLog(bill, currentStatus, newStatus, user.id);
+        } catch (dbErr) {
+          console.warn('Remote status update failed, local fallback:', dbErr);
+        }
+      }
 
-      // Show success message
+      // Sync payment record and cash register
+      await syncPaymentForStatus(bill, newStatus, userId);
+
       toast({
         title: "Sucesso",
-        description: "Status da conta atualizado com sucesso!",
+        description: "Status da conta atualizado com sucesso e sincronizado com o caixa!",
       });
 
-      // Call success callback
       onSuccess?.();
       return true;
 

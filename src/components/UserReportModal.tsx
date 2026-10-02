@@ -208,7 +208,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
     return new Intl.DateTimeFormat("pt-BR").format(date);
   };
 
-  // Export PDF
+  // Export PDF with title header, margin masks, headers/footers & page numbers
   const handleExportPDF = async () => {
     const printElement = document.getElementById("user-report-printable-area");
     if (!printElement) return;
@@ -223,36 +223,113 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
 
+      // Hide no-print elements during PDF capture
+      const noPrintEls = printElement.querySelectorAll<HTMLElement>(".modal-no-print");
+      noPrintEls.forEach((el) => {
+        el.dataset.origDisplay = el.style.display;
+        el.style.display = "none";
+      });
+
+      // Temporarily expand container height to capture all rows fully
+      const origMaxHeight = printElement.style.maxHeight;
+      const origOverflow = printElement.style.overflow;
+      const origHeight = printElement.style.height;
+
+      printElement.style.maxHeight = "none";
+      printElement.style.overflow = "visible";
+      printElement.style.height = "auto";
+
       const canvas = await html2canvas(printElement, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
+        windowWidth: 1200,
       });
 
-      const pdf = new jsPDF("p", "mm", "a4");
+      // Restore original container styles and element visibility
+      printElement.style.maxHeight = origMaxHeight;
+      printElement.style.overflow = origOverflow;
+      printElement.style.height = origHeight;
+      noPrintEls.forEach((el) => {
+        el.style.display = el.dataset.origDisplay || "";
+      });
+
+      // A4 PDF Dimensions in mm
       const pdfW = 210;
       const pdfH = 297;
-      const margin = 10;
-      const usableW = pdfW - margin * 2;
-      const usableH = pdfH - margin * 2;
+      const marginTop = 15;
+      const marginBottom = 15;
+      const marginX = 12;
 
+      const usableW = pdfW - marginX * 2; // 186mm
+      const usableH = pdfH - marginTop - marginBottom; // 267mm
+
+      const imgWidth = usableW;
+      const imgHeight = (canvas.height * usableW) / canvas.width;
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const aspect = canvas.height / canvas.width;
-      let w = usableW;
-      let h = w * aspect;
 
-      if (h > usableH) {
-        h = usableH;
-        w = h / aspect;
+      const pdf = new jsPDF("p", "mm", "a4");
+      const totalPages = Math.max(1, Math.ceil(imgHeight / usableH));
+
+      const issueDateStr = new Date().toLocaleDateString("pt-BR");
+      const issueTimeStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+      for (let i = 1; i <= totalPages; i++) {
+        if (i > 1) {
+          pdf.addPage();
+        }
+
+        // Calculate Y position offset for current page slice
+        const positionY = marginTop - (i - 1) * usableH;
+
+        // Draw captured canvas image
+        pdf.addImage(imgData, "JPEG", marginX, positionY, imgWidth, imgHeight);
+
+        // Solid white rectangle mask for top margin
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pdfW, marginTop, "F");
+
+        // Solid white rectangle mask for bottom margin
+        pdf.rect(0, pdfH - marginBottom, pdfW, marginBottom, "F");
+
+        // Running top header on pages 2+
+        if (i > 1) {
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 116, 139); // Slate-500
+          pdf.text(`Relatório Individual • ${userName}`, marginX, marginTop - 5);
+          pdf.text(`AdmMaster`, pdfW - marginX, marginTop - 5, { align: "right" });
+
+          pdf.setDrawColor(226, 232, 240); // Slate-200
+          pdf.setLineWidth(0.3);
+          pdf.line(marginX, marginTop - 3, pdfW - marginX, marginTop - 3);
+        }
+
+        // Running bottom footer on all pages
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.3);
+        pdf.line(marginX, pdfH - marginBottom + 3, pdfW - marginX, pdfH - marginBottom + 3);
+
+        pdf.setFontSize(8);
+        pdf.setTextColor(148, 163, 184); // Slate-400
+        pdf.text(
+          `AdmMaster Gerenciamento de Contas • Emissão: ${issueDateStr} ${issueTimeStr}`,
+          marginX,
+          pdfH - marginBottom + 8
+        );
+        pdf.text(
+          `Página ${i} de ${totalPages}`,
+          pdfW - marginX,
+          pdfH - marginBottom + 8,
+          { align: "right" }
+        );
       }
 
-      pdf.addImage(imgData, "JPEG", margin + (usableW - w) / 2, margin, w, h);
       pdf.save(`Relatorio_Individual_${userName?.replace(/\s+/g, "_")}.pdf`);
 
       toast({
         title: "PDF Gerado com Sucesso!",
-        description: `Arquivo de ${userName} baixado.`,
+        description: `Arquivo de ${userName} baixado com ${totalPages} página(s).`,
       });
     } catch (err) {
       console.error("Erro ao gerar PDF do usuário:", err);
@@ -313,28 +390,6 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl w-full max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden bg-background border shadow-2xl">
-        <style>{`
-          @media print {
-            body * {
-              visibility: hidden !important;
-            }
-            #user-report-printable-area, #user-report-printable-area * {
-              visibility: visible !important;
-            }
-            #user-report-printable-area {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              background: #ffffff !important;
-              color: #000000 !important;
-              padding: 15px !important;
-            }
-            .modal-no-print {
-              display: none !important;
-            }
-          }
-        `}</style>
 
         {/* Modal Header */}
         <div className="p-4 sm:p-6 border-b bg-gradient-to-r from-muted/50 via-background to-muted/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 modal-no-print">
@@ -464,19 +519,57 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
 
         {/* Printable / Main Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6" id="user-report-printable-area">
-          {/* Printable Report Header */}
-          <div className="hidden print:block mb-4 border-b pb-3">
-            <div className="flex items-center justify-between">
+          {/* Printable & PDF Header Title */}
+          <div id="pdf-report-header-title" className="mb-4 pb-4 border-b border-border bg-card/40 p-4 rounded-lg">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Relatório Individual de Contas</h1>
-                <p className="text-sm text-gray-600">
-                  Usuário: <strong>{userName}</strong> | Emitido em: {new Date().toLocaleDateString("pt-BR")}
-                </p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">
+                    AdmMaster • Gestão Financeira
+                  </span>
+                  <span className="text-xs text-muted-foreground">|</span>
+                  <span className="text-xs text-muted-foreground font-medium">Relatório de Lançamentos</span>
+                </div>
+                <h1 className="text-xl font-bold text-foreground tracking-tight">
+                  Relatório Individual de Contas & Despesas
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2 font-medium">
+                  <div>
+                    <span>Usuário:</span>{" "}
+                    <strong className="text-foreground font-semibold">{userName}</strong>
+                  </div>
+                  <div>•</div>
+                  <div>
+                    <span>Período:</span>{" "}
+                    <strong className="text-foreground font-semibold">
+                      {periodScope === "current" && periodFilter
+                        ? periodFilter.periodMode === "month"
+                          ? `${MONTH_NAMES[periodFilter.selectedMonth]} / ${periodFilter.selectedYear}`
+                          : `Ano ${periodFilter.selectedYear}`
+                        : "Todo o Histórico"}
+                    </strong>
+                  </div>
+                  <div>•</div>
+                  <div>
+                    <span>Emissão:</span>{" "}
+                    <strong className="text-foreground font-semibold">
+                      {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </strong>
+                  </div>
+                </div>
               </div>
-              <div
-                className="w-8 h-8 rounded-full"
-                style={{ backgroundColor: userColor }}
-              />
+
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm"
+                  style={{ backgroundColor: userColor }}
+                >
+                  {userName.substring(0, 2).toUpperCase()}
+                </div>
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  {userFilteredBills.length} {userFilteredBills.length === 1 ? "registro" : "registros"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -627,6 +720,12 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
                 </table>
               </div>
             )}
+          </div>
+
+          {/* Printable Footer */}
+          <div className="hidden print:flex items-center justify-between pt-4 mt-6 border-t border-gray-300 text-[10px] text-gray-500 font-medium">
+            <span>AdmMaster Gerenciamento de Contas • Documento de Impressão</span>
+            <span>Emitido em {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
           </div>
         </div>
       </DialogContent>

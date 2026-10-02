@@ -8,6 +8,10 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import SupplierForm from "./pages/SupplierForm";
+import CompanyForm from "./pages/CompanyForm";
+import FinancialEntries from "./pages/FinancialEntries";
+import CashRegister from "./pages/CashRegister";
+import PaymentsList from "./pages/PaymentsList";
 import BillForm from "./pages/BillForm";
 import BillEdit from "./pages/BillEdit";
 import BillDetail from "./pages/BillDetail";
@@ -41,6 +45,12 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/fornecedores/novo" element={<ProtectedRoute><SupplierForm /></ProtectedRoute>} />
+              <Route path="/empresas" element={<ProtectedRoute><CompanyForm /></ProtectedRoute>} />
+              <Route path="/empresas/nova" element={<ProtectedRoute><CompanyForm /></ProtectedRoute>} />
+              <Route path="/entradas" element={<ProtectedRoute><FinancialEntries /></ProtectedRoute>} />
+              <Route path="/entradas/nova" element={<ProtectedRoute><FinancialEntries /></ProtectedRoute>} />
+              <Route path="/caixa" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
+              <Route path="/pagamentos" element={<ProtectedRoute><PaymentsList /></ProtectedRoute>} />
               <Route path="/contas/nova" element={<ProtectedRoute><BillForm /></ProtectedRoute>} />
               <Route path="/contas/editar/:id" element={<ProtectedRoute><BillEdit /></ProtectedRoute>} />
               <Route path="/conta/:id" element={<ProtectedRoute><BillDetail /></ProtectedRoute>} />

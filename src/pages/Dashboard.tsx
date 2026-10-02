@@ -18,7 +18,12 @@ import {
   FileText,
   Image as ImageIcon,
   Users,
-  BarChart3
+  BarChart3,
+  Wallet,
+  Building,
+  ArrowDownLeft,
+  Receipt,
+  Tag
 } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,6 +44,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
 // Extend the Window interface to include inactivityTimer
 declare global {
   interface Window {
@@ -49,6 +59,9 @@ declare global {
 const Dashboard = () => {
   const { getUserBadgeStyle } = useExpenseUsers();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const currentRefDate = selectedDate || new Date();
+  const selectedMonth = currentRefDate.getMonth();
+  const selectedYear = currentRefDate.getFullYear();
   const [allBills, setAllBills] = useState<any[]>([]);
   const [upcomingBills, setUpcomingBills] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -191,7 +204,7 @@ const Dashboard = () => {
         checkNumber: bill.check_number,
         bankName: bill.banks?.name,
         accountHolder: bill.account_holder,
-        billType: (bill.bill_type === 'despesa' || bill.payment_type === 'despesa') ? 'despesa' : 'conta',
+        billType: ((bill as any).bill_type === 'despesa' || bill.payment_type === 'despesa') ? 'despesa' : 'conta',
       })) || [];
       
       // Atualizar status das contas baseado na data atual ANTES de salvar
@@ -516,14 +529,16 @@ const Dashboard = () => {
       value: stats.pendingBills.toString(),
       icon: AlertTriangle,
       color: "text-warning",
-      bgColor: "bg-warning/10"
+      bgColor: "bg-warning/10",
+      statusFilter: "pending"
     },
     {
       title: "Contas Vencidas",
       value: stats.overdueBills.toString(),
       icon: AlertTriangle,
       color: "text-destructive",
-      bgColor: "bg-destructive/10"
+      bgColor: "bg-destructive/10",
+      statusFilter: "overdue"
     },
     {
       title: "Total do Mês",
@@ -533,7 +548,8 @@ const Dashboard = () => {
       }).format(stats.totalAmount),
       icon: DollarSign,
       color: "text-primary",
-      bgColor: "bg-primary/10"
+      bgColor: "bg-primary/10",
+      statusFilter: "all"
     },
     {
       title: "Pagas",
@@ -543,12 +559,57 @@ const Dashboard = () => {
       }).format(stats.paidBillsTotal)})`,
       icon: TrendingUp,
       color: "text-success",
-      bgColor: "bg-success/10"
+      bgColor: "bg-success/10",
+      statusFilter: "paid"
     }
   ];
 
   const MobileMenu = () => (
     <div className="space-y-4 p-4">
+      <Button 
+        variant="outline" 
+        className="w-full justify-start text-primary font-medium" 
+        onClick={() => {
+          navigate("/caixa");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <Wallet className="w-4 h-4 mr-2" />
+        Caixa e Extrato
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full justify-start" 
+        onClick={() => {
+          navigate("/entradas");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <ArrowDownLeft className="w-4 h-4 mr-2 text-emerald-600" />
+        Entradas (Receitas)
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full justify-start" 
+        onClick={() => {
+          navigate("/empresas");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <Building className="w-4 h-4 mr-2" />
+        Empresas / Clientes
+      </Button>
+      <Button 
+        variant="outline" 
+        className="w-full justify-start" 
+        onClick={() => {
+          navigate("/pagamentos");
+          setMobileMenuOpen(false);
+        }}
+      >
+        <Receipt className="w-4 h-4 mr-2" />
+        Pagamentos de Contas
+      </Button>
       <Button 
         variant="outline" 
         className="w-full justify-start" 
@@ -639,80 +700,167 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/20">
       {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={() => navigate("/perfil")}
-                className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center hover:bg-primary/90 transition-colors cursor-pointer"
-              >
-                <Building2 className="w-6 h-6 text-primary-foreground" />
-              </button>
-              <div>
-                <h1 className="text-lg sm:text-xl font-semibold">Gerenciador de Contas</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {capitalizeFirst(format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR }))}
-                </p>
-                {userProfile && (
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Olá, {userProfile.first_name} {userProfile.last_name}
-                  </p>
-                )}
+      <header className="border-b bg-card/90 backdrop-blur-md sticky top-0 z-40 shadow-sm border-border/60">
+        <div className="container mx-auto px-4 py-2.5 sm:py-3">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            
+            {/* Left Brand & Context */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => navigate("/perfil")}
+                  className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center hover:scale-105 hover:shadow-md transition-all cursor-pointer text-primary-foreground shadow-sm shrink-0"
+                  title="Ver Perfil da Empresa"
+                >
+                  <Building2 className="w-5 h-5 text-primary-foreground" />
+                </button>
+                <div>
+                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+                    Gerenciador de Contas
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground font-medium">
+                    <span>{capitalizeFirst(format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR }))}</span>
+                    {userProfile && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="text-foreground font-semibold">
+                          Olá, {userProfile.first_name} {userProfile.last_name}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Mobile Menu Trigger */}
+              <div className="lg:hidden">
+                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 px-2.5">
+                      <Menu className="w-4 h-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent>
+                    <div className="mt-6">
+                      <h2 className="text-lg font-semibold mb-4">Menu Principal</h2>
+                      <MobileMenu />
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
             </div>
             
-            {/* Desktop Menu */}
-            <div className="hidden lg:flex items-center space-x-2">
-              <Button size="sm" variant="outline" onClick={() => navigate("/relatorios")}>
-                <BarChart3 className="w-4 h-4 mr-2 text-primary" />
-                Relatórios
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate("/usuarios-despesas")}>
-                <Users className="w-4 h-4 mr-2" />
-                Usuários
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate("/tipos-fornecedor")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Tipos de Fornecedor
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate("/fornecedores/novo")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Fornecedor
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate("/bancos")}>
-                <Landmark className="w-4 h-4 mr-2" />
-                Bancos
-              </Button>
-              <Button size="sm" onClick={() => navigate("/contas/nova")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Conta
-              </Button>
-              <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={() => navigate("/despesas/nova")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Despesa
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
+            {/* Desktop Navigation & Actions */}
+            <div className="hidden lg:flex items-center justify-end gap-2.5 flex-wrap">
+              
+              {/* Navigation Segmented Group */}
+              <nav className="flex items-center gap-0.5 bg-muted/60 p-1 rounded-xl border border-border/50 shadow-xs">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/caixa")}
+                >
+                  <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Caixa</span>
+                </Button>
 
-            {/* Mobile Menu */}
-            <div className="lg:hidden">
-              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Menu className="w-4 h-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <div className="mt-6">
-                    <h2 className="text-lg font-semibold mb-4">Menu</h2>
-                    <MobileMenu />
-                  </div>
-                </SheetContent>
-              </Sheet>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/entradas")}
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Entradas</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/empresas")}
+                >
+                  <Building className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Empresas</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/pagamentos")}
+                >
+                  <Receipt className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Pagamentos</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/relatorios")}
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Relatórios</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/tipos-fornecedor")}
+                >
+                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>+ Tipos</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 px-2.5 text-xs font-semibold text-foreground hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all gap-1.5 [&_svg]:transition-colors"
+                  onClick={() => navigate("/fornecedores/novo")}
+                >
+                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>+ Fornecedores</span>
+                </Button>
+              </nav>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  size="sm" 
+                  className="h-8 px-3 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs gap-1.5 rounded-lg"
+                  onClick={() => navigate("/contas/nova")}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nova Conta</span>
+                </Button>
+
+                <Button 
+                  size="sm" 
+                  className="h-8 px-3 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-xs gap-1.5 rounded-lg"
+                  onClick={() => navigate("/despesas/nova")}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nova Despesa</span>
+                </Button>
+              </div>
+
+              {/* Separator & Logout */}
+              <div className="h-5 w-px bg-border/80 mx-0.5" />
+
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-8 px-2.5 text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors gap-1.5 rounded-lg"
+                onClick={handleLogout}
+                title="Sair da Conta"
+              >
+                <LogOut className="w-3.5 h-3.5 text-destructive" />
+                <span>Sair</span>
+              </Button>
+
             </div>
           </div>
         </div>
@@ -722,14 +870,23 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {statsCards.map((stat, index) => (
-            <Card key={index} className="border-0 shadow-sm bg-card/60 backdrop-blur-sm">
+            <Card 
+              key={index} 
+              onClick={() => {
+                if (stat.statusFilter) {
+                  navigate(`/contas?status=${stat.statusFilter}&month=${selectedMonth}&year=${selectedYear}`);
+                }
+              }}
+              className="border-0 shadow-sm bg-card/60 backdrop-blur-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all group"
+              title={`Clique para ver ${stat.title.toLowerCase()} de ${MONTH_NAMES[selectedMonth]} / ${selectedYear}`}
+            >
               <CardContent className="p-2 sm:p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
                   <div className="w-full sm:w-auto">
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">{stat.title}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">{stat.title}</p>
                     <p className="text-lg sm:text-2xl font-bold truncate">{stat.value}</p>
                   </div>
-                  <div className={`p-1.5 sm:p-2 rounded-lg ${stat.bgColor} self-end sm:self-auto`}>
+                  <div className={`p-1.5 sm:p-2 rounded-lg ${stat.bgColor} self-end sm:self-auto group-hover:scale-110 transition-transform`}>
                     <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
                   </div>
                 </div>
@@ -750,9 +907,9 @@ const Dashboard = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => navigate("/relatorios")}
-                className="text-xs flex items-center gap-1.5"
+                className="text-xs flex items-center gap-1.5 hover:bg-emerald-600 hover:text-white hover:[&_svg]:text-white transition-all"
               >
-                <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
                 Relatórios
               </Button>
             </div>
@@ -844,63 +1001,88 @@ const Dashboard = () => {
           {/* Right Sidebar */}
           <div className="space-y-4 sm:space-y-6">
             {/* Overdue Bills */}
-            {allBills.filter(bill => bill.status === 'overdue').length > 0 && (
-              <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center text-sm sm:text-base">
-                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-destructive" />
-                    Contas Vencidas
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Contas que já passaram do vencimento
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
-                  {allBills
-                    .filter(bill => bill.status === 'overdue')
-                    .slice(0, 5)
-                    .map((bill) => (
-                     <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                       <div className="flex items-start justify-between mb-1 sm:mb-2">
-                         <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
-                         <Badge variant="destructive" className="text-xs shrink-0">
-                           {safeFormatDate(bill.dueDate, "dd/MM")}
-                         </Badge>
-                       </div>
-                       <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
-                       {bill.paymentType === 'cheque' && (
-                         <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
-                           {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
-                           {bill.bankName && <p>Banco: {bill.bankName}</p>}
-                           {bill.accountHolder && (
-                              <div className="flex items-center gap-1 pt-0.5">
-                                <span>Titular:</span>
-                                <Badge 
-                                  variant="outline" 
-                                  className="text-[10px] py-0 px-1 font-semibold"
-                                  style={getUserBadgeStyle(bill.accountHolder)}
-                                >
-                                  {bill.accountHolder}
-                                </Badge>
-                              </div>
-                            )}
-                         </div>
-                       )}
-                       <p className="font-semibold text-destructive text-xs sm:text-sm">
-                         {new Intl.NumberFormat('pt-BR', {
-                           style: 'currency',
-                           currency: 'BRL'
-                         }).format(bill.amount)}
-                       </p>
-                     </div>
-                  ))}
-                  
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/contas?status=overdue")}>
-                    Ver todas as contas vencidas
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            {(() => {
+              const monthOverdue = allBills.filter(bill => {
+                const bMonth = bill.dueDate.getMonth();
+                const bYear = bill.dueDate.getFullYear();
+                return bill.status === 'overdue' && bMonth === selectedMonth && bYear === selectedYear;
+              });
+
+              const hasOverdueInMonth = monthOverdue.length > 0;
+              const displayOverdue = hasOverdueInMonth 
+                ? monthOverdue 
+                : allBills.filter(bill => bill.status === 'overdue');
+
+              if (displayOverdue.length === 0) return null;
+
+              return (
+                <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="flex items-center justify-between text-sm sm:text-base">
+                      <span className="flex items-center">
+                        <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-destructive" />
+                        Contas Vencidas
+                      </span>
+                      <Badge variant={hasOverdueInMonth ? "destructive" : "outline"} className="text-[10px]">
+                        {hasOverdueInMonth ? MONTH_NAMES[selectedMonth] : 'Todas'}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      {hasOverdueInMonth 
+                        ? `Contas vencidas em ${MONTH_NAMES[selectedMonth]} de ${selectedYear}`
+                        : `Contas que já passaram do vencimento`
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+                    {displayOverdue.slice(0, 5).map((bill) => (
+                      <div key={bill.id} className="p-2 sm:p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                        <div className="flex items-start justify-between mb-1 sm:mb-2">
+                          <h4 className="font-medium text-xs sm:text-sm truncate pr-2">{bill.description}</h4>
+                          <Badge variant="destructive" className="text-xs shrink-0">
+                            {safeFormatDate(bill.dueDate, "dd/MM")}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1 truncate">{bill.supplier}</p>
+                        {bill.paymentType === 'cheque' && (
+                          <div className="text-xs text-muted-foreground space-y-0.5 mb-1">
+                            {bill.checkNumber && <p>Nº Cheque: {bill.checkNumber}</p>}
+                            {bill.bankName && <p>Banco: {bill.bankName}</p>}
+                            {bill.accountHolder && (
+                               <div className="flex items-center gap-1 pt-0.5">
+                                 <span>Titular:</span>
+                                 <Badge 
+                                   variant="outline" 
+                                   className="text-[10px] py-0 px-1 font-semibold"
+                                   style={getUserBadgeStyle(bill.accountHolder)}
+                                 >
+                                   {bill.accountHolder}
+                                 </Badge>
+                               </div>
+                             )}
+                          </div>
+                        )}
+                        <p className="font-semibold text-destructive text-xs sm:text-sm">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL'
+                          }).format(bill.amount)}
+                        </p>
+                      </div>
+                    ))}
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full" 
+                      onClick={() => navigate(`/contas?status=overdue&month=${selectedMonth}&year=${selectedYear}`)}
+                    >
+                      Ver contas vencidas do mês ({stats.overdueBills})
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* Upcoming Bills */}
             <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
