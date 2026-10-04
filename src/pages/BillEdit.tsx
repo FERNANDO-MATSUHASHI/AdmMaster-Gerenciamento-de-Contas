@@ -37,6 +37,7 @@ const BillEdit = () => {
     supplier_id: "",
     check_number: "",
     account_holder: "",
+    account_holder_cheque: "",
     bank_id: "",
     payment_type: "conta",
     status: "pending",
@@ -125,6 +126,7 @@ const BillEdit = () => {
         supplier_id: data.supplier_id || "",
         check_number: data.check_number || "",
         account_holder: data.account_holder || "",
+        account_holder_cheque: data.account_name || "",
         bank_id: data.bank_id || "",
         payment_type: data.payment_type || "conta",
         status: isDespesa ? "paid" : (data.status || "pending"),
@@ -352,15 +354,17 @@ const BillEdit = () => {
 
       const parsedAmount = parseFloat(String(formData.amount).replace(',', '.'));
 
+      const isCheque = formData.payment_type === 'cheque';
       const updateData: any = {
         description: formData.description,
         amount: isNaN(parsedAmount) ? 0 : parsedAmount,
         due_date: dueDateToSave,
         entry_date: formData.entry_date,
         supplier_id: formData.supplier_id || null,
-        check_number: formData.payment_type === 'cheque' ? formData.check_number || null : null,
+        check_number: isCheque ? formData.check_number || null : null,
         account_holder: formData.account_holder || null,
-        bank_id: formData.payment_type === 'cheque' ? formData.bank_id || null : null,
+        account_name: isCheque ? (formData.account_holder_cheque || null) : null,
+        bank_id: isCheque ? formData.bank_id || null : null,
         payment_type: isDespesa ? 'despesa' : formData.payment_type,
         status: isDespesa ? 'paid' : formData.status,
         attachment_url: attachmentUrl || null
@@ -378,7 +382,7 @@ const BillEdit = () => {
         description: "Conta atualizada com sucesso!",
       });
 
-      navigate("/contas");
+      navigate("/dashboard");
     } catch (error) {
       console.error('Erro ao atualizar conta:', error);
       toast({
@@ -576,7 +580,7 @@ const BillEdit = () => {
                   </div>
                   <Select 
                     value={formData.account_holder || ""} 
-                    onValueChange={(value) => setFormData({ ...formData, account_holder: value })}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, account_holder: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Ex: Fernando, Luciane..." />
@@ -727,11 +731,11 @@ const BillEdit = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="account_holder">Titular da Conta *</Label>
+                      <Label htmlFor="account_holder_cheque">Titular da Conta *</Label>
                       <Input
-                        id="account_holder"
-                        value={formData.account_holder}
-                        onChange={(e) => setFormData({ ...formData, account_holder: e.target.value })}
+                        id="account_holder_cheque"
+                        value={formData.account_holder_cheque}
+                        onChange={(e) => setFormData(prev => ({ ...prev, account_holder_cheque: e.target.value }))}
                         required={formData.payment_type === "cheque"}
                       />
                     </div>

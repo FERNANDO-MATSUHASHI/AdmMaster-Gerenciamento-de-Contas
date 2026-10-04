@@ -115,6 +115,7 @@ const BillsList = () => {
           payment_proof_url,
           check_number,
           account_holder,
+          account_name,
           bank_id,
           suppliers (name),
           banks (name)
@@ -142,6 +143,7 @@ const BillsList = () => {
         checkNumber: bill.check_number,
         bankName: bill.banks?.name,
         accountHolder: bill.account_holder,
+        accountName: bill.account_name,
         billType: (bill.bill_type === 'despesa' || bill.payment_type === 'despesa') ? 'despesa' : 'conta'
       })) || [];
       
@@ -645,17 +647,11 @@ const BillsList = () => {
                             <span className="text-sm font-medium">{bill.bankName}</span>
                           </div>
                         )}
-                        {bill.accountHolder && (
+                        {(bill.accountName || bill.accountHolder) && (
                           <div className="flex items-center space-x-2">
                             <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                             <span className="text-sm text-muted-foreground">Titular:</span>
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs font-semibold"
-                              style={getUserBadgeStyle(bill.accountHolder)}
-                            >
-                              {bill.accountHolder}
-                            </Badge>
+                            <span className="text-sm font-medium">{bill.accountName || bill.accountHolder}</span>
                           </div>
                         )}
                       </>

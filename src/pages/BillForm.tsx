@@ -35,6 +35,7 @@ const BillForm = () => {
     numeroCheque: "",
     banco: "",
     titularConta: "",
+    titularCheque: "",
     // Campos do boleto/cheque parcelado
     quantidadeParcelas: "1",
     parcelasDatas: [new Date()],
@@ -465,10 +466,11 @@ const BillForm = () => {
             supplier_id: formData.fornecedor || null,
             due_date: `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`,
             entry_date: `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`,
-          payment_type: formData.paymentType,
+            payment_type: formData.paymentType,
             check_number: formData.paymentType === 'cheque' ? (formData.parcelasNumerosCheque[index] || null) : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
             account_holder: formData.titularConta || null,
+            account_name: formData.paymentType === 'cheque' ? (formData.titularCheque || null) : null,
             status: 'pending',
             attachment_url: uploadedUrls[index] || null
           };
@@ -538,6 +540,7 @@ const BillForm = () => {
             check_number: formData.paymentType === 'cheque' ? formData.numeroCheque || null : null,
             bank_id: formData.paymentType === 'cheque' ? formData.banco || null : null,
             account_holder: formData.titularConta || null,
+            account_name: formData.paymentType === 'cheque' ? (formData.titularCheque || null) : null,
             status: 'pending',
             attachment_url: attachmentUrl
           })
@@ -772,22 +775,24 @@ const BillForm = () => {
                   </div>
                 </div>
 
-                {/* Dados do Cheque (aparecem quando tipo = cheque e não é parcelado) */}
-                {formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) === 1 && (
+                {/* Dados do Cheque */}
+                {formData.paymentType === "cheque" && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Dados do Cheque</h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="numeroCheque">Número do Cheque *</Label>
-                        <Input
-                          id="numeroCheque"
-                          placeholder="000001"
-                          value={formData.numeroCheque}
-                          onChange={(e) => handleInputChange("numeroCheque", e.target.value)}
-                          required={formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) === 1}
-                        />
-                      </div>
+                    <div className={cn("grid grid-cols-1 gap-4", parseInt(formData.quantidadeParcelas) === 1 ? "md:grid-cols-3" : "md:grid-cols-2")}>
+                      {parseInt(formData.quantidadeParcelas) === 1 && (
+                        <div>
+                          <Label htmlFor="numeroCheque">Número do Cheque *</Label>
+                          <Input
+                            id="numeroCheque"
+                            placeholder="000001"
+                            value={formData.numeroCheque}
+                            onChange={(e) => handleInputChange("numeroCheque", e.target.value)}
+                            required={formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) === 1}
+                          />
+                        </div>
+                      )}
 
                       <div>
                         <div className="flex items-center justify-between">
@@ -817,59 +822,12 @@ const BillForm = () => {
                       </div>
 
                       <div>
-                        <Label htmlFor="titularConta">Titular da Conta *</Label>
+                        <Label htmlFor="titularCheque">Titular da Conta *</Label>
                         <Input
-                          id="titularConta"
+                          id="titularCheque"
                           placeholder="Nome do titular"
-                          value={formData.titularConta}
-                          onChange={(e) => handleInputChange("titularConta", e.target.value)}
-                          required={formData.paymentType === "cheque"}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Banco e Titular para cheques parcelados (aparecem quando tipo = cheque e é parcelado) */}
-                {formData.paymentType === "cheque" && parseInt(formData.quantidadeParcelas) >= 2 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Dados do Cheque</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="banco">Banco *</Label>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => navigate("/bancos/novo")}
-                            className="h-auto p-1"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <Select value={formData.banco} onValueChange={(value) => handleInputChange("banco", value)} required={formData.paymentType === "cheque"}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o banco" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {banks.map((bank) => (
-                              <SelectItem key={bank.id} value={bank.id}>
-                                {bank.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="titularConta">Titular da Conta *</Label>
-                        <Input
-                          id="titularConta"
-                          placeholder="Nome do titular"
-                          value={formData.titularConta}
-                          onChange={(e) => handleInputChange("titularConta", e.target.value)}
+                          value={formData.titularCheque}
+                          onChange={(e) => handleInputChange("titularCheque", e.target.value)}
                           required={formData.paymentType === "cheque"}
                         />
                       </div>
@@ -880,9 +838,9 @@ const BillForm = () => {
                 {/* Dados de Parcelamento (aparecem quando tipo = boleto ou cheque) */}
                 {(formData.paymentType === "boleto" || formData.paymentType === "cheque") && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium">
-                      {formData.paymentType === "boleto" ? "Dados do Boleto" : "Dados do Cheque"}
-                    </h3>
+                    {formData.paymentType === "boleto" && (
+                      <h3 className="text-lg font-medium">Dados do Boleto</h3>
+                    )}
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
