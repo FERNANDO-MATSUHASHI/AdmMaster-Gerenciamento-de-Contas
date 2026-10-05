@@ -446,8 +446,25 @@ const CompanyForm = () => {
           </CardHeader>
           <CardContent>
             {filteredCompanies.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? "Nenhuma empresa encontrada para a pesquisa." : "Nenhuma empresa cadastrada ainda."}
+              <div className="text-center py-8 text-muted-foreground space-y-4">
+                <p>{searchTerm ? "Nenhuma empresa encontrada para a pesquisa." : "Nenhuma empresa cadastrada ainda neste ambiente de deploy."}</p>
+                {!searchTerm && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 border-primary/40 text-primary hover:bg-primary/5"
+                    onClick={async () => {
+                      const result = await createCompany({
+                        cnpj: "12.345.678/0001-90",
+                        razao_social: "Porto Serviço",
+                        status: "active"
+                      });
+                      if (result) fetchCompanies();
+                    }}
+                  >
+                    <Plus className="h-4 w-4" /> Cadastrar "Porto Serviço" com 1 Clique
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
