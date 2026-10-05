@@ -62,6 +62,7 @@ const CompanyForm = () => {
   const fetchCompanies = async () => {
     try {
       let remote: Company[] = [];
+      let supabaseAvailable = false;
       try {
         const { data, error } = await supabase
           .from('companies')
@@ -70,12 +71,47 @@ const CompanyForm = () => {
 
         if (!error && data) {
           remote = data;
+          supabaseAvailable = true;
         }
       } catch (e) {
         console.warn('Remote companies fetch fallback to local storage', e);
       }
 
       const locals = getLocalCompanies();
+
+      // Auto sync local items to Supabase cloud if available and user authenticated
+      if (supabaseAvailable && locals.length > 0) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const remoteCnpjs = new Set(remote.map(c => (c.cnpj || '').replace(/\D/g, '')));
+            const toUpload = locals.filter(l => l.cnpj && !remoteCnpjs.has(l.cnpj.replace(/\D/g, '')));
+
+            for (const item of toUpload) {
+              const { data: inserted, error: insErr } = await supabase.from('companies').insert({
+                user_id: user.id,
+                cnpj: item.cnpj,
+                razao_social: item.razao_social,
+                cep: item.cep || null,
+                logradouro: item.logradouro || null,
+                numero: item.numero || null,
+                complemento: item.complemento || null,
+                bairro: item.bairro || null,
+                cidade: item.cidade || null,
+                estado: item.estado || null,
+                status: item.status || 'active'
+              }).select().single();
+
+              if (!insErr && inserted) {
+                remote.unshift(inserted);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Auto-sync local companies failed:', syncErr);
+        }
+      }
+
       const existingRemoteIds = new Set(remote.map(c => c.id));
       const combined = [...remote, ...locals.filter(c => !existingRemoteIds.has(c.id))];
 

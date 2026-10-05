@@ -106,6 +106,7 @@ const FinancialEntries = () => {
   const fetchEntries = async () => {
     try {
       let remote: FinancialEntry[] = [];
+      let supabaseAvailable = false;
       try {
         const { data, error } = await supabase
           .from('financial_entries')
@@ -120,6 +121,7 @@ const FinancialEntries = () => {
 
         if (!error && data) {
           remote = data;
+          supabaseAvailable = true;
         }
       } catch (e) {
         console.warn('Remote entries fetch fallback to local', e);
@@ -127,6 +129,38 @@ const FinancialEntries = () => {
 
       const locals = getLocalFinancialEntries();
       const allCompanies = getLocalCompanies();
+
+      // Auto sync local entries to Supabase cloud if available and user authenticated
+      if (supabaseAvailable && locals.length > 0) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const remoteDescriptions = new Set(remote.map(r => `${r.description}_${r.amount}_${r.expected_date}`));
+            const toUpload = locals.filter(l => !remoteDescriptions.has(`${l.description}_${l.amount}_${l.expected_date}`));
+
+            for (const item of toUpload) {
+              const { data: inserted, error: insErr } = await supabase.from('financial_entries').insert({
+                user_id: user.id,
+                company_id: item.company_id,
+                description: item.description,
+                op_number: item.op_number || null,
+                amount: Number(item.amount),
+                expected_date: item.expected_date,
+                received_date: item.received_date || null,
+                payment_method: item.payment_method,
+                status: item.status || 'pending',
+                observation: item.observation || null
+              }).select(`*, companies(razao_social, cnpj)`).single();
+
+              if (!insErr && inserted) {
+                remote.unshift(inserted);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Auto sync local financial entries failed:', syncErr);
+        }
+      }
 
       const enrichedLocals = locals.map(e => {
         if (!e.companies && e.company_id) {
