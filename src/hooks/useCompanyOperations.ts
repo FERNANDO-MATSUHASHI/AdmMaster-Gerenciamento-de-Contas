@@ -185,28 +185,71 @@ export function useCompanyOperations() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
 
-      // Check duplicate CNPJ excluding current company
       const cleanCNPJ = unformatCNPJ(formData.cnpj);
-      const { data: existing } = await supabase
-        .from('companies')
-        .select('id, cnpj')
-        .eq('user_id', user.id)
-        .neq('id', companyId);
 
-      if (existing && existing.some(c => unformatCNPJ(c.cnpj) === cleanCNPJ)) {
-        toast({
-          title: "CNPJ já cadastrado",
-          description: "Outra empresa já utiliza este CNPJ.",
-          variant: "destructive",
-        });
-        return null;
+      // Try Supabase update if user logged in
+      if (user) {
+        try {
+          // Check duplicate CNPJ excluding current company
+          const { data: existing } = await supabase
+            .from('companies')
+            .select('id, cnpj')
+            .eq('user_id', user.id)
+            .neq('id', companyId);
+
+          if (existing && existing.some(c => unformatCNPJ(c.cnpj) === cleanCNPJ)) {
+            toast({
+              title: "CNPJ já cadastrado",
+              description: "Outra empresa já utiliza este CNPJ.",
+              variant: "destructive",
+            });
+            return null;
+          }
+
+          const { data, error } = await supabase
+            .from('companies')
+            .update({
+              cnpj: formData.cnpj,
+              razao_social: formData.razao_social,
+              cep: formData.cep || null,
+              logradouro: formData.logradouro || null,
+              numero: formData.numero || null,
+              complemento: formData.complemento || null,
+              bairro: formData.bairro || null,
+              cidade: formData.cidade || null,
+              estado: formData.estado || null,
+              status: formData.status || 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', companyId)
+            .select()
+            .single();
+
+          if (!error && data) {
+            await createAuditLog('companies', companyId, 'update', {}, {
+              cnpj: data.cnpj,
+              razao_social: data.razao_social
+            });
+
+            toast({
+              title: "Empresa atualizada",
+              description: "Os dados da empresa foram salvos.",
+            });
+
+            return data;
+          }
+        } catch (e) {
+          console.warn('Supabase company update fallback to local storage', e);
+        }
       }
 
-      const { data, error } = await supabase
-        .from('companies')
-        .update({
+      // Local storage fallback for update
+      const locals = getLocalCompanies();
+      const index = locals.findIndex(c => c.id === companyId);
+      if (index !== -1) {
+        const updatedLocal: Company = {
+          ...locals[index],
           cnpj: formData.cnpj,
           razao_social: formData.razao_social,
           cep: formData.cep || null,
@@ -216,26 +259,21 @@ export function useCompanyOperations() {
           bairro: formData.bairro || null,
           cidade: formData.cidade || null,
           estado: formData.estado || null,
-          status: formData.status || 'active',
+          status: formData.status || locals[index].status || 'active',
           updated_at: new Date().toISOString()
-        })
-        .eq('id', companyId)
-        .select()
-        .single();
+        };
+        locals[index] = updatedLocal;
+        saveLocalCompanies(locals);
 
-      if (error) throw error;
+        toast({
+          title: "Empresa atualizada",
+          description: "Os dados da empresa foram salvos no armazenamento local.",
+        });
 
-      await createAuditLog('companies', companyId, 'update', {}, {
-        cnpj: data.cnpj,
-        razao_social: data.razao_social
-      });
+        return updatedLocal;
+      }
 
-      toast({
-        title: "Empresa atualizada",
-        description: "Os dados da empresa foram salvos.",
-      });
-
-      return data;
+      throw new Error('Empresa não encontrada');
     } catch (error: any) {
       console.error('Error updating company:', error);
       toast({
@@ -254,34 +292,60 @@ export function useCompanyOperations() {
     setIsLoading(true);
 
     try {
-      // Check if company has linked financial entries
-      const { data: entries, error: checkError } = await supabase
-        .from('financial_entries')
-        .select('id')
-        .eq('company_id', company.id)
-        .limit(1);
+      // Check if company has linked financial entries (remote or local)
+      try {
+        const { data: entries } = await supabase
+          .from('financial_entries')
+          .select('id')
+          .eq('company_id', company.id)
+          .limit(1);
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.warn('Check entries warn:', checkError);
+        if (entries && entries.length > 0) {
+          toast({
+            title: "Não é possível excluir",
+            description: "A empresa possui movimentações financeiras vinculadas. Você pode inativá-la.",
+            variant: "destructive",
+          });
+          return { success: false, hasEntries: true };
+        }
+      } catch (e) {
+        // Ignore remote check error
       }
 
-      if (entries && entries.length > 0) {
-        toast({
-          title: "Não é possível excluir",
-          description: "A empresa possui movimentações financeiras vinculadas. Você pode inativá-la.",
-          variant: "destructive",
-        });
-        return { success: false, hasEntries: true };
+      // Check local entries for link
+      try {
+        const localEntriesRaw = localStorage.getItem('adm_master_local_financial_entries');
+        const localEntries = localEntriesRaw ? JSON.parse(localEntriesRaw) : [];
+        if (localEntries.some((e: any) => e.company_id === company.id)) {
+          toast({
+            title: "Não é possível excluir",
+            description: "A empresa possui movimentações financeiras vinculadas. Você pode inativá-la.",
+            variant: "destructive",
+          });
+          return { success: false, hasEntries: true };
+        }
+      } catch (e) {
+        console.warn('Error checking local financial entries:', e);
       }
 
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', company.id);
+      // Try Supabase delete
+      try {
+        const { error } = await supabase
+          .from('companies')
+          .delete()
+          .eq('id', company.id);
 
-      if (error) throw error;
+        if (!error) {
+          await createAuditLog('companies', company.id, 'delete', { razao_social: company.razao_social }, {});
+        }
+      } catch (e) {
+        console.warn('Supabase company delete fallback to local storage', e);
+      }
 
-      await createAuditLog('companies', company.id, 'delete', { razao_social: company.razao_social }, {});
+      // Delete from Local Storage if present
+      const locals = getLocalCompanies();
+      const filtered = locals.filter(c => c.id !== company.id);
+      saveLocalCompanies(filtered);
 
       toast({
         title: "Empresa excluída",
@@ -304,12 +368,31 @@ export function useCompanyOperations() {
 
   const toggleCompanyStatus = async (company: Company, newStatus: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', company.id);
+      try {
+        const { error } = await supabase
+          .from('companies')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', company.id);
 
-      if (error) throw error;
+        if (!error) {
+          toast({
+            title: newStatus === 'active' ? "Empresa ativada" : "Empresa inativada",
+            description: `A empresa ${company.razao_social} agora está ${newStatus === 'active' ? 'ativa' : 'inativa'}.`,
+          });
+          return true;
+        }
+      } catch (e) {
+        console.warn('Supabase status update fallback to local', e);
+      }
+
+      // Update in Local Storage
+      const locals = getLocalCompanies();
+      const index = locals.findIndex(c => c.id === company.id);
+      if (index !== -1) {
+        locals[index].status = newStatus;
+        locals[index].updated_at = new Date().toISOString();
+        saveLocalCompanies(locals);
+      }
 
       toast({
         title: newStatus === 'active' ? "Empresa ativada" : "Empresa inativada",

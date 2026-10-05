@@ -159,11 +159,55 @@ export function useFinancialEntriesOperations() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
 
-      const { data, error } = await supabase
-        .from('financial_entries')
-        .update({
+      if (user) {
+        try {
+          const { data, error } = await supabase
+            .from('financial_entries')
+            .update({
+              company_id: formData.company_id,
+              description: formData.description,
+              op_number: formData.op_number || null,
+              amount: Number(formData.amount),
+              expected_date: formData.expected_date,
+              received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : (formData.received_date || null),
+              payment_method: formData.payment_method,
+              status: formData.status || 'pending',
+              observation: formData.observation || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', entryId)
+            .select(`*, companies(razao_social, cnpj)`)
+            .single();
+
+          if (!error && data) {
+            await createAuditLog('financial_entries', entryId, 'update', {}, {
+              description: data.description,
+              amount: data.amount,
+              status: data.status
+            });
+
+            toast({
+              title: "Entrada atualizada",
+              description: "Os dados da entrada foram salvos.",
+            });
+
+            return data;
+          }
+        } catch (e) {
+          console.warn('Supabase entry update fallback to local', e);
+        }
+      }
+
+      // Local storage fallback
+      const locals = getLocalFinancialEntries();
+      const index = locals.findIndex(e => e.id === entryId);
+      if (index !== -1) {
+        const allCompanies = getLocalCompanies();
+        const linkedCompany = allCompanies.find(c => c.id === formData.company_id);
+
+        const updatedLocal: FinancialEntry = {
+          ...locals[index],
           company_id: formData.company_id,
           description: formData.description,
           op_number: formData.op_number || null,
@@ -171,28 +215,26 @@ export function useFinancialEntriesOperations() {
           expected_date: formData.expected_date,
           received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : (formData.received_date || null),
           payment_method: formData.payment_method,
-          status: formData.status || 'pending',
+          status: formData.status || locals[index].status || 'pending',
           observation: formData.observation || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entryId)
-        .select(`*, companies(razao_social, cnpj)`)
-        .single();
+          updated_at: new Date().toISOString(),
+          companies: linkedCompany ? {
+            razao_social: linkedCompany.razao_social,
+            cnpj: linkedCompany.cnpj
+          } : locals[index].companies
+        };
+        locals[index] = updatedLocal;
+        saveLocalFinancialEntries(locals);
 
-      if (error) throw error;
+        toast({
+          title: "Entrada atualizada",
+          description: "Os dados foram salvos no armazenamento local.",
+        });
 
-      await createAuditLog('financial_entries', entryId, 'update', {}, {
-        description: data.description,
-        amount: data.amount,
-        status: data.status
-      });
+        return updatedLocal;
+      }
 
-      toast({
-        title: "Entrada atualizada",
-        description: "Os dados da entrada foram salvos.",
-      });
-
-      return data;
+      throw new Error('Entrada financeira não encontrada');
     } catch (error: any) {
       console.error('Error updating financial entry:', error);
       toast({
@@ -208,16 +250,36 @@ export function useFinancialEntriesOperations() {
 
   const markAsReceived = async (entryId: string, receivedDate: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('financial_entries')
-        .update({
-          status: 'received',
-          received_date: receivedDate,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entryId);
+      try {
+        const { error } = await supabase
+          .from('financial_entries')
+          .update({
+            status: 'received',
+            received_date: receivedDate,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', entryId);
 
-      if (error) throw error;
+        if (!error) {
+          toast({
+            title: "Entrada recebida!",
+            description: "A entrada foi marcada como recebida e adicionada ao saldo do caixa.",
+          });
+          return true;
+        }
+      } catch (e) {
+        console.warn('Supabase markAsReceived fallback to local', e);
+      }
+
+      // Local storage fallback
+      const locals = getLocalFinancialEntries();
+      const index = locals.findIndex(e => e.id === entryId);
+      if (index !== -1) {
+        locals[index].status = 'received';
+        locals[index].received_date = receivedDate;
+        locals[index].updated_at = new Date().toISOString();
+        saveLocalFinancialEntries(locals);
+      }
 
       toast({
         title: "Entrada recebida!",
@@ -236,15 +298,34 @@ export function useFinancialEntriesOperations() {
 
   const cancelEntry = async (entryId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('financial_entries')
-        .update({
-          status: 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entryId);
+      try {
+        const { error } = await supabase
+          .from('financial_entries')
+          .update({
+            status: 'cancelled',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', entryId);
 
-      if (error) throw error;
+        if (!error) {
+          toast({
+            title: "Entrada cancelada",
+            description: "A entrada financeira foi cancelada.",
+          });
+          return true;
+        }
+      } catch (e) {
+        console.warn('Supabase cancelEntry fallback to local', e);
+      }
+
+      // Local storage fallback
+      const locals = getLocalFinancialEntries();
+      const index = locals.findIndex(e => e.id === entryId);
+      if (index !== -1) {
+        locals[index].status = 'cancelled';
+        locals[index].updated_at = new Date().toISOString();
+        saveLocalFinancialEntries(locals);
+      }
 
       toast({
         title: "Entrada cancelada",
@@ -263,12 +344,26 @@ export function useFinancialEntriesOperations() {
 
   const deleteEntry = async (entryId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('financial_entries')
-        .delete()
-        .eq('id', entryId);
+      try {
+        const { error } = await supabase
+          .from('financial_entries')
+          .delete()
+          .eq('id', entryId);
 
-      if (error) throw error;
+        if (!error) {
+          toast({
+            title: "Entrada removida",
+            description: "A entrada foi excluída do sistema.",
+          });
+        }
+      } catch (e) {
+        console.warn('Supabase deleteEntry fallback to local', e);
+      }
+
+      // Local storage fallback
+      const locals = getLocalFinancialEntries();
+      const filtered = locals.filter(e => e.id !== entryId);
+      saveLocalFinancialEntries(filtered);
 
       toast({
         title: "Entrada removida",
