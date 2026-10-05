@@ -261,6 +261,7 @@ const SupplierForm = () => {
       estado: estado
     });
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (supplier: any) => {

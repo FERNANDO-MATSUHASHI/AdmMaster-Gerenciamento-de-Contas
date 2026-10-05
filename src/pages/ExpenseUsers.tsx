@@ -51,6 +51,7 @@ const ExpenseUsers = () => {
     setEditingUserId(u.id);
     setName(u.name);
     setSelectedColor(u.color || "#3b82f6");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCancelEdit = () => {

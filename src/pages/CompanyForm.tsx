@@ -199,6 +199,7 @@ const CompanyForm = () => {
       status: company.status || "active"
     });
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteRequest = async (company: Company) => {

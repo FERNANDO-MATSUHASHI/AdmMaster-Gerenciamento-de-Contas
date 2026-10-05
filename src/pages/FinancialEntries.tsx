@@ -213,7 +213,7 @@ const FinancialEntries = () => {
       op_number: formData.op_number,
       amount: numAmount,
       expected_date: formData.expected_date,
-      received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : undefined,
+      received_date: formData.status === 'received' ? (formData.received_date || format(new Date(), 'yyyy-MM-dd')) : (formData.received_date || undefined),
       payment_method: formData.payment_method,
       status: formData.status,
       observation: formData.observation
@@ -235,17 +235,18 @@ const FinancialEntries = () => {
   const handleEdit = (entry: FinancialEntry) => {
     setEditingEntry(entry);
     setFormData({
-      company_id: entry.company_id,
-      description: entry.description,
+      company_id: entry.company_id || "",
+      description: entry.description || "",
       op_number: entry.op_number || "",
-      amount: entry.amount.toString(),
-      expected_date: entry.expected_date,
+      amount: entry.amount ? entry.amount.toString() : "",
+      expected_date: entry.expected_date || format(new Date(), 'yyyy-MM-dd'),
       received_date: entry.received_date || "",
-      payment_method: entry.payment_method,
-      status: entry.status,
+      payment_method: entry.payment_method || "Pix",
+      status: entry.status || "pending",
       observation: entry.observation || ""
     });
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleConfirmReceivedSubmit = async () => {
@@ -502,7 +503,11 @@ const FinancialEntries = () => {
                     </div>
                     <Select
                       value={formData.status}
-                      onValueChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
+                      onValueChange={(val) => setFormData(prev => ({
+                        ...prev,
+                        status: val,
+                        received_date: val === 'received' && !prev.received_date ? format(new Date(), 'yyyy-MM-dd') : prev.received_date
+                      }))}
                     >
                       <SelectTrigger id="status">
                         <SelectValue placeholder="Selecione o status" />
@@ -524,7 +529,7 @@ const FinancialEntries = () => {
                       <Input
                         id="received_date"
                         type="date"
-                        value={formData.received_date || formData.expected_date}
+                        value={formData.received_date || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, received_date: e.target.value }))}
                       />
                     </div>
