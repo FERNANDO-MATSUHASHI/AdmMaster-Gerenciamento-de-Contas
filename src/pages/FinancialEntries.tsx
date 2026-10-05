@@ -62,6 +62,7 @@ const FinancialEntries = () => {
   const [formData, setFormData] = useState({
     company_id: "",
     description: "",
+    op_number: "",
     amount: "",
     expected_date: format(new Date(), 'yyyy-MM-dd'),
     received_date: "",
@@ -175,6 +176,7 @@ const FinancialEntries = () => {
     const payload = {
       company_id: formData.company_id,
       description: formData.description,
+      op_number: formData.op_number,
       amount: numAmount,
       expected_date: formData.expected_date,
       received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : undefined,
@@ -201,6 +203,7 @@ const FinancialEntries = () => {
     setFormData({
       company_id: entry.company_id,
       description: entry.description,
+      op_number: entry.op_number || "",
       amount: entry.amount.toString(),
       expected_date: entry.expected_date,
       received_date: entry.received_date || "",
@@ -238,6 +241,7 @@ const FinancialEntries = () => {
     setFormData({
       company_id: "",
       description: "",
+      op_number: "",
       amount: "",
       expected_date: format(new Date(), 'yyyy-MM-dd'),
       received_date: "",
@@ -252,6 +256,7 @@ const FinancialEntries = () => {
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = 
       entry.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (entry.op_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (entry.companies?.razao_social || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (entry.observation || "").toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -345,7 +350,7 @@ const FinancialEntries = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Empresa / Cliente */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between h-5">
@@ -386,6 +391,19 @@ const FinancialEntries = () => {
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       required
+                    />
+                  </div>
+
+                  {/* Número da OP */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between h-5">
+                      <Label htmlFor="op_number">Número da OP</Label>
+                    </div>
+                    <Input
+                      id="op_number"
+                      placeholder="Ex: OP-12345"
+                      value={formData.op_number}
+                      onChange={(e) => setFormData(prev => ({ ...prev, op_number: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -567,6 +585,11 @@ const FinancialEntries = () => {
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-base truncate">{entry.description}</h3>
+                        {entry.op_number && (
+                          <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary bg-primary/5">
+                            OP: {entry.op_number}
+                          </Badge>
+                        )}
                         <Badge
                           variant={
                             entry.status === 'received'
@@ -588,6 +611,11 @@ const FinancialEntries = () => {
                           <Building className="h-3.5 w-3.5 text-primary" />
                           {entry.companies?.razao_social || 'Sem empresa'}
                         </span>
+                        {entry.op_number && (
+                          <span className="font-medium text-foreground">
+                            🔢 OP: {entry.op_number}
+                          </span>
+                        )}
                         <span>
                           📅 Previsto: {format(new Date(entry.expected_date + 'T00:00:00'), 'dd/MM/yyyy')}
                         </span>

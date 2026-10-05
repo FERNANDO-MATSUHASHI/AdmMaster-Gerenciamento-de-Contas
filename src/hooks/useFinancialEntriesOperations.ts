@@ -9,6 +9,7 @@ export interface FinancialEntry {
   user_id: string;
   company_id: string;
   description: string;
+  op_number?: string | null;
   amount: number;
   expected_date: string;
   received_date?: string | null;
@@ -26,6 +27,7 @@ export interface FinancialEntry {
 export interface FinancialEntryFormData {
   company_id: string;
   description: string;
+  op_number?: string;
   amount: number;
   expected_date: string;
   received_date?: string;
@@ -74,6 +76,7 @@ export function useFinancialEntriesOperations() {
               user_id: user.id,
               company_id: formData.company_id,
               description: formData.description,
+              op_number: formData.op_number || null,
               amount: Number(formData.amount),
               expected_date: formData.expected_date,
               received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : null,
@@ -112,6 +115,7 @@ export function useFinancialEntriesOperations() {
         user_id: user?.id || 'local-user',
         company_id: formData.company_id,
         description: formData.description,
+        op_number: formData.op_number || null,
         amount: Number(formData.amount),
         expected_date: formData.expected_date,
         received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : null,
@@ -162,6 +166,7 @@ export function useFinancialEntriesOperations() {
         .update({
           company_id: formData.company_id,
           description: formData.description,
+          op_number: formData.op_number || null,
           amount: Number(formData.amount),
           expected_date: formData.expected_date,
           received_date: formData.status === 'received' ? (formData.received_date || formData.expected_date) : (formData.received_date || null),

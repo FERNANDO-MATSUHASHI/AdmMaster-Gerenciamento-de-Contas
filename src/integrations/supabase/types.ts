@@ -346,6 +346,7 @@ export type Database = {
           expected_date: string
           id: string
           observation: string | null
+          op_number: string | null
           payment_method: string
           received_date: string | null
           status: string
@@ -360,6 +361,7 @@ export type Database = {
           expected_date: string
           id?: string
           observation?: string | null
+          op_number?: string | null
           payment_method: string
           received_date?: string | null
           status?: string
@@ -374,6 +376,7 @@ export type Database = {
           expected_date?: string
           id?: string
           observation?: string | null
+          op_number?: string | null
           payment_method?: string
           received_date?: string | null
           status?: string
