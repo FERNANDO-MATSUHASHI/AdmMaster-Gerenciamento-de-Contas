@@ -11,6 +11,8 @@ export interface FinancialEntry {
   description: string;
   op_number?: string | null;
   amount: number;
+  gross_amount?: number | null;
+  discount?: number | null;
   expected_date: string;
   received_date?: string | null;
   payment_method: string;
@@ -29,6 +31,8 @@ export interface FinancialEntryFormData {
   description: string;
   op_number?: string;
   amount: number;
+  gross_amount?: number;
+  discount?: number;
   expected_date: string;
   received_date?: string;
   payment_method: string;
@@ -70,27 +74,44 @@ export function useFinancialEntriesOperations() {
       // Try Supabase insert
       if (user) {
         try {
-          const { data, error } = await supabase
+          const insertPayload: any = {
+            user_id: user.id,
+            company_id: formData.company_id,
+            description: formData.description,
+            op_number: formData.op_number || null,
+            amount: Number(formData.amount),
+            gross_amount: formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + Number(formData.discount || 0)),
+            discount: Number(formData.discount || 0),
+            expected_date: formData.expected_date,
+            received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
+            payment_method: formData.payment_method,
+            status: formData.status || 'pending',
+            observation: formData.observation || null
+          };
+
+          let { data, error } = await supabase
             .from('financial_entries')
-            .insert({
-              user_id: user.id,
-              company_id: formData.company_id,
-              description: formData.description,
-              op_number: formData.op_number || null,
-              amount: Number(formData.amount),
-              expected_date: formData.expected_date,
-              received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
-              payment_method: formData.payment_method,
-              status: formData.status || 'pending',
-              observation: formData.observation || null
-            })
+            .insert(insertPayload)
             .select(`*, companies(razao_social, cnpj)`)
             .single();
+
+          if (error && (error.message?.includes('discount') || error.message?.includes('gross_amount'))) {
+            delete insertPayload.discount;
+            delete insertPayload.gross_amount;
+            const retryRes = await supabase
+              .from('financial_entries')
+              .insert(insertPayload)
+              .select(`*, companies(razao_social, cnpj)`)
+              .single();
+            data = retryRes.data;
+            error = retryRes.error;
+          }
 
           if (!error && data) {
             await createAuditLog('financial_entries', data.id, 'create', {}, {
               description: data.description,
               amount: data.amount,
+              discount: data.discount,
               status: data.status
             });
 
@@ -117,6 +138,8 @@ export function useFinancialEntriesOperations() {
         description: formData.description,
         op_number: formData.op_number || null,
         amount: Number(formData.amount),
+        gross_amount: formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + Number(formData.discount || 0)),
+        discount: Number(formData.discount || 0),
         expected_date: formData.expected_date,
         received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
         payment_method: formData.payment_method,
@@ -162,28 +185,46 @@ export function useFinancialEntriesOperations() {
 
       if (user) {
         try {
-          const { data, error } = await supabase
+          const updatePayload: any = {
+            company_id: formData.company_id,
+            description: formData.description,
+            op_number: formData.op_number || null,
+            amount: Number(formData.amount),
+            gross_amount: formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + Number(formData.discount || 0)),
+            discount: Number(formData.discount || 0),
+            expected_date: formData.expected_date,
+            received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
+            payment_method: formData.payment_method,
+            status: formData.status || 'pending',
+            observation: formData.observation || null,
+            updated_at: new Date().toISOString()
+          };
+
+          let { data, error } = await supabase
             .from('financial_entries')
-            .update({
-              company_id: formData.company_id,
-              description: formData.description,
-              op_number: formData.op_number || null,
-              amount: Number(formData.amount),
-              expected_date: formData.expected_date,
-              received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
-              payment_method: formData.payment_method,
-              status: formData.status || 'pending',
-              observation: formData.observation || null,
-              updated_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('id', entryId)
             .select(`*, companies(razao_social, cnpj)`)
             .single();
+
+          if (error && (error.message?.includes('discount') || error.message?.includes('gross_amount'))) {
+            delete updatePayload.discount;
+            delete updatePayload.gross_amount;
+            const retryRes = await supabase
+              .from('financial_entries')
+              .update(updatePayload)
+              .eq('id', entryId)
+              .select(`*, companies(razao_social, cnpj)`)
+              .single();
+            data = retryRes.data;
+            error = retryRes.error;
+          }
 
           if (!error && data) {
             await createAuditLog('financial_entries', entryId, 'update', {}, {
               description: data.description,
               amount: data.amount,
+              discount: data.discount,
               status: data.status
             });
 
@@ -212,6 +253,8 @@ export function useFinancialEntriesOperations() {
           description: formData.description,
           op_number: formData.op_number || null,
           amount: Number(formData.amount),
+          gross_amount: formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + Number(formData.discount || 0)),
+          discount: Number(formData.discount || 0),
           expected_date: formData.expected_date,
           received_date: formData.received_date || (formData.status === 'received' ? new Date().toISOString().split('T')[0] : null),
           payment_method: formData.payment_method,

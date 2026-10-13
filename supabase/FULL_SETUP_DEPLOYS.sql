@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS public.financial_entries (
   description TEXT NOT NULL,
   op_number TEXT,
   amount NUMERIC(12,2) NOT NULL,
+  gross_amount NUMERIC(12,2),
+  discount NUMERIC(12,2) DEFAULT 0,
   expected_date DATE NOT NULL,
   received_date DATE,
   payment_method TEXT NOT NULL,
@@ -55,8 +57,10 @@ CREATE TABLE IF NOT EXISTS public.financial_entries (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Garantir coluna op_number se a tabela já existir
+-- Garantir colunas se a tabela já existir
 ALTER TABLE public.financial_entries ADD COLUMN IF NOT EXISTS op_number TEXT;
+ALTER TABLE public.financial_entries ADD COLUMN IF NOT EXISTS discount NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE public.financial_entries ADD COLUMN IF NOT EXISTS gross_amount NUMERIC(12,2);
 
 ALTER TABLE public.financial_entries ENABLE ROW LEVEL SECURITY;
 

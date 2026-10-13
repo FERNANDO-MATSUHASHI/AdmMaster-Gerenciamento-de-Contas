@@ -64,6 +64,7 @@ const FinancialEntries = () => {
     description: "",
     op_number: "",
     amount: "",
+    discount: "",
     expected_date: format(new Date(), 'yyyy-MM-dd'),
     received_date: "",
     payment_method: "Pix",
@@ -139,18 +140,30 @@ const FinancialEntries = () => {
             const toUpload = locals.filter(l => !remoteDescriptions.has(`${l.description}_${l.amount}_${l.expected_date}`));
 
             for (const item of toUpload) {
-              const { data: inserted, error: insErr } = await supabase.from('financial_entries').insert({
+              const insertPayload: any = {
                 user_id: user.id,
                 company_id: item.company_id,
                 description: item.description,
                 op_number: item.op_number || null,
                 amount: Number(item.amount),
+                gross_amount: item.gross_amount !== undefined ? Number(item.gross_amount) : (Number(item.amount) + Number(item.discount || 0)),
+                discount: Number(item.discount || 0),
                 expected_date: item.expected_date,
                 received_date: item.received_date || null,
                 payment_method: item.payment_method,
                 status: item.status || 'pending',
                 observation: item.observation || null
-              }).select(`*, companies(razao_social, cnpj)`).single();
+              };
+
+              let { data: inserted, error: insErr } = await supabase.from('financial_entries').insert(insertPayload).select(`*, companies(razao_social, cnpj)`).single();
+
+              if (insErr && (insErr.message?.includes('discount') || insErr.message?.includes('gross_amount'))) {
+                delete insertPayload.discount;
+                delete insertPayload.gross_amount;
+                const retry = await supabase.from('financial_entries').insert(insertPayload).select(`*, companies(razao_social, cnpj)`).single();
+                inserted = retry.data;
+                insErr = retry.error;
+              }
 
               if (!insErr && inserted) {
                 remote.unshift(inserted);
@@ -197,8 +210,8 @@ const FinancialEntries = () => {
       return;
     }
 
-    const numAmount = parseFloat(formData.amount.replace(',', '.'));
-    if (isNaN(numAmount) || numAmount <= 0) {
+    const numGrossAmount = parseFloat(formData.amount.replace(',', '.'));
+    if (isNaN(numGrossAmount) || numGrossAmount <= 0) {
       toast({
         title: "Valor inválido",
         description: "Informe um valor positivo válido.",
@@ -207,11 +220,34 @@ const FinancialEntries = () => {
       return;
     }
 
+    const numDiscount = formData.discount ? parseFloat(formData.discount.replace(',', '.')) : 0;
+    if (isNaN(numDiscount) || numDiscount < 0) {
+      toast({
+        title: "Desconto inválido",
+        description: "Informe um valor de desconto válido ou deixe em branco.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (numDiscount > numGrossAmount) {
+      toast({
+        title: "Desconto inválido",
+        description: "O valor do desconto não pode ser maior do que o valor da entrada.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const finalAmount = Math.max(0, numGrossAmount - numDiscount);
+
     const payload = {
       company_id: formData.company_id,
       description: formData.description,
       op_number: formData.op_number,
-      amount: numAmount,
+      amount: finalAmount,
+      gross_amount: numGrossAmount,
+      discount: numDiscount,
       expected_date: formData.expected_date,
       received_date: formData.status === 'received' ? (formData.received_date || format(new Date(), 'yyyy-MM-dd')) : (formData.received_date || undefined),
       payment_method: formData.payment_method,
@@ -234,11 +270,16 @@ const FinancialEntries = () => {
 
   const handleEdit = (entry: FinancialEntry) => {
     setEditingEntry(entry);
+    const grossVal = entry.gross_amount !== undefined && entry.gross_amount !== null
+      ? entry.gross_amount
+      : (entry.discount ? Number(entry.amount) + Number(entry.discount) : entry.amount);
+
     setFormData({
       company_id: entry.company_id || "",
       description: entry.description || "",
       op_number: entry.op_number || "",
-      amount: entry.amount ? entry.amount.toString() : "",
+      amount: grossVal ? grossVal.toString() : "",
+      discount: entry.discount ? entry.discount.toString() : "",
       expected_date: entry.expected_date || format(new Date(), 'yyyy-MM-dd'),
       received_date: entry.received_date || "",
       payment_method: entry.payment_method || "Pix",
@@ -278,6 +319,7 @@ const FinancialEntries = () => {
       description: "",
       op_number: "",
       amount: "",
+      discount: "",
       expected_date: format(new Date(), 'yyyy-MM-dd'),
       received_date: "",
       payment_method: "Pix",
@@ -308,6 +350,15 @@ const FinancialEntries = () => {
   const totalPending = entries
     .filter(e => e.status === 'pending')
     .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const numBaseAmount = parseFloat((formData.amount || "0").replace(',', '.')) || 0;
+  const numDiscount = parseFloat((formData.discount || "0").replace(',', '.')) || 0;
+  const calculatedTotal = Math.max(0, numBaseAmount - numDiscount);
+  const isDiscountOverValue = numDiscount > numBaseAmount && numBaseAmount > 0;
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/20 p-4 sm:p-6 lg:p-8">
@@ -453,6 +504,7 @@ const FinancialEntries = () => {
                       id="amount"
                       type="number"
                       step="0.01"
+                      min="0"
                       placeholder="0,00"
                       value={formData.amount}
                       onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
@@ -460,6 +512,57 @@ const FinancialEntries = () => {
                     />
                   </div>
 
+                  {/* Campo de Desconto */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between h-5">
+                      <Label htmlFor="discount">Desconto (R$)</Label>
+                      {numDiscount > 0 && !isDiscountOverValue && (
+                        <span className="text-[11px] text-amber-600 font-medium">
+                          -{formatCurrency(numDiscount)}
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      id="discount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0,00"
+                      value={formData.discount}
+                      onChange={(e) => setFormData(prev => ({ ...prev, discount: e.target.value }))}
+                      className={isDiscountOverValue ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {isDiscountOverValue && (
+                      <p className="text-[11px] text-destructive font-medium">
+                        O desconto não pode ser maior que o valor da entrada
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Valor Total Calculado */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between h-5">
+                      <Label htmlFor="total_amount" className="font-semibold text-emerald-700 dark:text-emerald-400">
+                        Valor Total (R$)
+                      </Label>
+                      {numDiscount > 0 && numBaseAmount > 0 && !isDiscountOverValue && (
+                        <span className="text-[11px] text-emerald-600 font-semibold">
+                          Com desconto aplicado
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      id="total_amount"
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={formatCurrency(calculatedTotal)}
+                      className="bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-bold cursor-default text-base focus-visible:ring-0 select-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Data Prevista de Recebimento */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between h-5">
@@ -493,9 +596,7 @@ const FinancialEntries = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Status */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between h-5">
@@ -519,9 +620,11 @@ const FinancialEntries = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
 
-                  {/* Data Efetiva (se recebido) */}
-                  {formData.status === 'received' && (
+                {/* Data Efetiva (se recebido) */}
+                {formData.status === 'received' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between h-5">
                         <Label htmlFor="received_date">Data Efetiva de Recebimento</Label>
@@ -533,8 +636,8 @@ const FinancialEntries = () => {
                         onChange={(e) => setFormData(prev => ({ ...prev, received_date: e.target.value }))}
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Observações */}
                 <div className="space-y-2">
@@ -629,6 +732,11 @@ const FinancialEntries = () => {
                             OP: {entry.op_number}
                           </Badge>
                         )}
+                        {entry.discount && Number(entry.discount) > 0 && (
+                          <Badge variant="outline" className="font-mono text-xs border-amber-500/40 text-amber-700 bg-amber-500/10 dark:text-amber-400">
+                            🏷️ Desconto: {formatCurrency(Number(entry.discount))}
+                          </Badge>
+                        )}
                         <Badge
                           variant={
                             entry.status === 'received'
@@ -672,9 +780,21 @@ const FinancialEntries = () => {
                     </div>
 
                     <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0">
-                      <p className="text-lg font-bold text-primary">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.amount)}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">
+                          {formatCurrency(entry.amount)}
+                        </p>
+                        {entry.discount && Number(entry.discount) > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            <span className="line-through">
+                              {formatCurrency(entry.gross_amount ?? (Number(entry.amount) + Number(entry.discount)))}
+                            </span>
+                            <span className="text-emerald-600 font-medium ml-1">
+                              (-{formatCurrency(Number(entry.discount))})
+                            </span>
+                          </p>
+                        )}
+                      </div>
 
                       <div className="flex items-center space-x-1">
                         {entry.status === 'pending' && (
@@ -725,10 +845,14 @@ const FinancialEntries = () => {
             <DialogDescription>
               Confirme a data efetiva em que o valor de{" "}
               <strong>
-                {confirmReceiveDialog &&
-                  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(confirmReceiveDialog.amount)}
+                {confirmReceiveDialog && formatCurrency(confirmReceiveDialog.amount)}
               </strong>{" "}
               foi recebido no caixa.
+              {confirmReceiveDialog && confirmReceiveDialog.discount && Number(confirmReceiveDialog.discount) > 0 && (
+                <span className="block mt-1 text-xs text-muted-foreground">
+                  (Valor original: {formatCurrency(confirmReceiveDialog.gross_amount ?? (Number(confirmReceiveDialog.amount) + Number(confirmReceiveDialog.discount)))} com desconto de {formatCurrency(Number(confirmReceiveDialog.discount))})
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
