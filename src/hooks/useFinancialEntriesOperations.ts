@@ -41,6 +41,41 @@ export interface FinancialEntryFormData {
 }
 
 const LOCAL_ENTRIES_KEY = 'adm_master_local_financial_entries';
+const DISCOUNT_CACHE_KEY = 'adm_master_financial_discounts_cache';
+
+export interface EntryDiscountMetadata {
+  gross_amount: number;
+  discount: number;
+}
+
+export const getDiscountsCache = (): Record<string, EntryDiscountMetadata> => {
+  try {
+    const raw = localStorage.getItem(DISCOUNT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const saveDiscountToCache = (entryId: string, gross_amount: number, discount: number) => {
+  try {
+    const cache = getDiscountsCache();
+    cache[entryId] = { gross_amount, discount };
+    localStorage.setItem(DISCOUNT_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.error('Error saving discount to cache:', e);
+  }
+};
+
+export const removeDiscountFromCache = (entryId: string) => {
+  try {
+    const cache = getDiscountsCache();
+    delete cache[entryId];
+    localStorage.setItem(DISCOUNT_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.error('Error removing discount from cache:', e);
+  }
+};
 
 export const getLocalFinancialEntries = (): FinancialEntry[] => {
   try {
@@ -108,10 +143,16 @@ export function useFinancialEntriesOperations() {
           }
 
           if (!error && data) {
+            const numDiscount = Number(formData.discount || 0);
+            const numGross = formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + numDiscount);
+            saveDiscountToCache(data.id, numGross, numDiscount);
+            data.gross_amount = numGross;
+            data.discount = numDiscount;
+
             await createAuditLog('financial_entries', data.id, 'create', {}, {
               description: data.description,
               amount: data.amount,
-              discount: data.discount,
+              discount: numDiscount,
               status: data.status
             });
 
@@ -153,6 +194,7 @@ export function useFinancialEntriesOperations() {
         } : undefined
       };
 
+      saveDiscountToCache(localEntry.id, localEntry.gross_amount || localEntry.amount, localEntry.discount || 0);
       const currentLocals = getLocalFinancialEntries();
       currentLocals.unshift(localEntry);
       saveLocalFinancialEntries(currentLocals);
@@ -221,10 +263,16 @@ export function useFinancialEntriesOperations() {
           }
 
           if (!error && data) {
+            const numDiscount = Number(formData.discount || 0);
+            const numGross = formData.gross_amount !== undefined ? Number(formData.gross_amount) : (Number(formData.amount) + numDiscount);
+            saveDiscountToCache(entryId, numGross, numDiscount);
+            data.gross_amount = numGross;
+            data.discount = numDiscount;
+
             await createAuditLog('financial_entries', entryId, 'update', {}, {
               description: data.description,
               amount: data.amount,
-              discount: data.discount,
+              discount: numDiscount,
               status: data.status
             });
 
@@ -266,6 +314,7 @@ export function useFinancialEntriesOperations() {
             cnpj: linkedCompany.cnpj
           } : locals[index].companies
         };
+        saveDiscountToCache(entryId, updatedLocal.gross_amount || updatedLocal.amount, updatedLocal.discount || 0);
         locals[index] = updatedLocal;
         saveLocalFinancialEntries(locals);
 
@@ -407,6 +456,7 @@ export function useFinancialEntriesOperations() {
       const locals = getLocalFinancialEntries();
       const filtered = locals.filter(e => e.id !== entryId);
       saveLocalFinancialEntries(filtered);
+      removeDiscountFromCache(entryId);
 
       toast({
         title: "Entrada removida",

@@ -24,7 +24,7 @@ import { ArrowLeft, Plus, Edit, Trash2, CheckCircle2, XCircle, Search, Calendar,
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Company, getLocalCompanies } from "@/hooks/useCompanyOperations";
-import { useFinancialEntriesOperations, FinancialEntry, getLocalFinancialEntries } from "@/hooks/useFinancialEntriesOperations";
+import { useFinancialEntriesOperations, FinancialEntry, getLocalFinancialEntries, getDiscountsCache } from "@/hooks/useFinancialEntriesOperations";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -188,8 +188,25 @@ const FinancialEntries = () => {
         return e;
       });
 
-      const existingRemoteIds = new Set(remote.map(re => re.id));
-      const combined = [...remote, ...enrichedLocals.filter(le => !existingRemoteIds.has(le.id))];
+      const discountsCache = getDiscountsCache();
+      const enrichedRemote = remote.map(r => {
+        const cached = discountsCache[r.id];
+        const rDiscount = (r.discount !== undefined && r.discount !== null && Number(r.discount) > 0)
+          ? Number(r.discount)
+          : (cached?.discount && cached.discount > 0 ? cached.discount : 0);
+        const rGross = (r.gross_amount !== undefined && r.gross_amount !== null && Number(r.gross_amount) > 0)
+          ? Number(r.gross_amount)
+          : (cached?.gross_amount && cached.gross_amount > 0 ? cached.gross_amount : (rDiscount > 0 ? Number(r.amount) + rDiscount : Number(r.amount)));
+
+        return {
+          ...r,
+          discount: rDiscount,
+          gross_amount: rGross
+        };
+      });
+
+      const existingRemoteIds = new Set(enrichedRemote.map(re => re.id));
+      const combined = [...enrichedRemote, ...enrichedLocals.filter(le => !existingRemoteIds.has(le.id))];
 
       setEntries(combined);
     } catch (error) {
@@ -270,16 +287,25 @@ const FinancialEntries = () => {
 
   const handleEdit = (entry: FinancialEntry) => {
     setEditingEntry(entry);
-    const grossVal = entry.gross_amount !== undefined && entry.gross_amount !== null
-      ? entry.gross_amount
-      : (entry.discount ? Number(entry.amount) + Number(entry.discount) : entry.amount);
+    const discountsCache = getDiscountsCache();
+    const cached = discountsCache[entry.id];
+
+    const discountNum = (entry.discount !== undefined && entry.discount !== null && Number(entry.discount) > 0)
+      ? Number(entry.discount)
+      : (cached?.discount && cached.discount > 0 ? cached.discount : 0);
+
+    const grossNum = (entry.gross_amount !== undefined && entry.gross_amount !== null && Number(entry.gross_amount) > 0)
+      ? Number(entry.gross_amount)
+      : (cached?.gross_amount && cached.gross_amount > 0
+          ? cached.gross_amount
+          : (discountNum > 0 ? Number(entry.amount) + discountNum : Number(entry.amount)));
 
     setFormData({
       company_id: entry.company_id || "",
       description: entry.description || "",
       op_number: entry.op_number || "",
-      amount: grossVal ? grossVal.toString() : "",
-      discount: entry.discount ? entry.discount.toString() : "",
+      amount: grossNum > 0 ? grossNum.toString() : (entry.amount ? entry.amount.toString() : ""),
+      discount: discountNum > 0 ? discountNum.toString() : "",
       expected_date: entry.expected_date || format(new Date(), 'yyyy-MM-dd'),
       received_date: entry.received_date || "",
       payment_method: entry.payment_method || "Pix",
